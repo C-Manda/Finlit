@@ -1,0 +1,94 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Link, usePathname, useRouter } from 'expo-router';
+import type { ComponentProps, ReactNode } from 'react';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
+import { commonStyles, palette, radii, spacing } from '@/constants/finlit-theme';
+
+type IconName = ComponentProps<typeof Ionicons>['name'];
+type Tone = 'blush' | 'mint' | 'blue' | 'peach' | 'lilac';
+
+export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
+  const body = scroll ? <ScrollView contentContainerStyle={commonStyles.content} showsVerticalScrollIndicator={false}>{children}</ScrollView> : children;
+  return <SafeAreaView style={commonStyles.page}>{body}</SafeAreaView>;
+}
+
+export function Header({ title, back = false, action }: { title: string; back?: boolean; action?: ReactNode }) {
+  const router = useRouter();
+  return <View style={styles.header}>{back ? <Pressable accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconButton}><Ionicons name="chevron-back" size={21} color={palette.ink} /></Pressable> : <View style={styles.headerSpacer} />}<Text style={styles.headerTitle}>{title}</Text>{action ?? <View style={styles.headerSpacer} />}</View>;
+}
+
+export function PrimaryButton({ title, onPress, tone = 'dark' }: { title: string; onPress?: () => void; tone?: 'dark' | 'outline' }) {
+  return <Pressable onPress={onPress} style={({ pressed }) => [styles.button, tone === 'outline' && styles.outlineButton, pressed && styles.pressed]}><Text style={[styles.buttonText, tone === 'outline' && styles.outlineText]}>{title}</Text></Pressable>;
+}
+
+export function SectionTitle({ title, action }: { title: string; action?: string }) {
+  return <View style={styles.sectionTitle}><Text style={styles.sectionText}>{title}</Text>{action ? <Text style={styles.linkText}>{action}</Text> : null}</View>;
+}
+
+export function ProgressBar({ value }: { value: number }) {
+  return <View style={styles.progress}><View style={[styles.progressFill, { width: `${value}%` }]} /></View>;
+}
+
+export function ToneCard({ tone, children, style }: { tone: Tone; children: ReactNode; style?: object }) {
+  return <View style={[styles.toneCard, { backgroundColor: palette[tone] }, style]}>{children}</View>;
+}
+
+export function ModuleCard({ title, subtitle, tone, icon, onPress }: { title: string; subtitle: string; tone: Tone; icon: IconName; onPress?: () => void }) {
+  return <Pressable onPress={onPress} style={({ pressed }) => [styles.moduleCard, { backgroundColor: palette[tone] }, pressed && styles.pressed]}><View style={styles.moduleIcon}><Ionicons name={icon} size={20} color={palette.ink} /></View><View style={styles.moduleCopy}><Text style={styles.moduleTitle}>{title}</Text><Text style={styles.moduleSubtitle}>{subtitle}</Text></View><Ionicons name="chevron-forward" size={18} color={palette.muted} /></Pressable>;
+}
+
+export function Field({ label, value, onChangeText, placeholder, secureTextEntry = false }: { label: string; value: string; onChangeText?: (text: string) => void; placeholder?: string; secureTextEntry?: boolean }) {
+  return <View style={styles.field}><Text style={commonStyles.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#aaa3a5" secureTextEntry={secureTextEntry} style={styles.input} /></View>;
+}
+
+export function BottomNavigation() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const items: { label: string; icon: IconName; path: string }[] = [
+    { label: 'Home', icon: 'home-outline', path: '/dashboard' },
+    { label: 'Learn', icon: 'book-outline', path: '/learn' },
+    { label: 'Budget', icon: 'wallet-outline', path: '/budget' },
+    { label: 'Loan', icon: 'calculator-outline', path: '/loan-calculator' },
+    { label: 'Profile', icon: 'person-outline', path: '/profile' },
+  ];
+  return <View style={styles.bottomNav}>{items.map((item) => { const active = pathname === item.path || (item.path === '/learn' && pathname.startsWith('/learn')); return <Pressable key={item.label} onPress={() => router.push(item.path as never)} style={[styles.navItem, active && styles.navItemActive]}><Ionicons name={item.icon} size={19} color={active ? palette.surface : palette.muted} /><Text style={[styles.navLabel, active && styles.navLabelActive]}>{item.label}</Text></Pressable>; })}</View>;
+}
+
+export function StudentShell({ children }: { children: ReactNode }) {
+  return <View style={commonStyles.page}>{children}<BottomNavigation /></View>;
+}
+
+export function ScreenLink({ href, children }: { href: string; children: ReactNode }) {
+  return <Link href={href as never} asChild><Pressable>{children}</Pressable></Link>;
+}
+
+const styles = StyleSheet.create({
+  header: { minHeight: 58, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerTitle: { color: palette.ink, fontSize: 16, fontWeight: '500' },
+  headerSpacer: { width: 42 },
+  iconButton: { width: 42, height: 42, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center' },
+  button: { minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: radii.pill, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
+  buttonText: { color: palette.surface, fontSize: 13, fontWeight: '500' },
+  outlineButton: { borderWidth: 1, borderColor: '#bdb6b9', backgroundColor: 'transparent' },
+  outlineText: { color: palette.ink },
+  pressed: { opacity: 0.76 },
+  sectionTitle: { marginTop: spacing.lg, marginBottom: spacing.sm, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionText: { color: palette.ink, fontSize: 15, fontWeight: '500' },
+  linkText: { color: palette.muted, fontSize: 11, fontWeight: '500' },
+  progress: { height: 6, borderRadius: radii.pill, backgroundColor: '#ebe7e9', overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: radii.pill, backgroundColor: palette.ink },
+  toneCard: { borderRadius: radii.md, padding: spacing.md },
+  moduleCard: { minHeight: 78, borderRadius: radii.md, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  moduleIcon: { width: 40, height: 40, borderRadius: radii.pill, backgroundColor: '#ffffff80', alignItems: 'center', justifyContent: 'center' },
+  moduleCopy: { flex: 1 },
+  moduleTitle: { color: palette.ink, fontSize: 13, fontWeight: '500' },
+  moduleSubtitle: { color: palette.muted, fontSize: 10, marginTop: 4 },
+  field: { gap: 5, marginBottom: spacing.sm },
+  input: { minHeight: 46, borderWidth: 1, borderColor: '#d9d4d6', borderRadius: radii.sm, backgroundColor: palette.surface, color: palette.ink, paddingHorizontal: 12, fontSize: 13 },
+  bottomNav: { position: 'absolute', left: 12, right: 12, bottom: 10, padding: 6, borderRadius: 22, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, flexDirection: 'row', justifyContent: 'space-around', elevation: 5, shadowColor: '#32232a', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+  navItem: { minWidth: 52, minHeight: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  navItemActive: { backgroundColor: palette.ink },
+  navLabel: { color: palette.muted, fontSize: 9 },
+  navLabelActive: { color: palette.surface },
+});
