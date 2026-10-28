@@ -1,3 +1,1 @@
-import { LearnView } from '@/components/screen-views';
-
-export default LearnView;
+export { LearnView as default } from '@/components/screen-views';

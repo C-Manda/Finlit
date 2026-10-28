@@ -1,13 +1,19 @@
-// Prototype screen catalog intentionally keeps visual placeholder data close to each view.
-// @ts-nocheck
+import { CurriculumPlan, SampleRecommendation } from '@/components/sample-learning';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter as useExpoRouter } from 'expo-router';
+import { Redirect, useRouter as useExpoRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { entries, modules, quizOptions, savedExplanations } from '@/mock-data';
 import { commonStyles, palette, radii, spacing } from '@/constants/finlit-theme';
-import { Field, Header, ModuleCard, PrimaryButton, ProgressBar, Screen, SectionTitle, StudentShell, ToneCard } from '@/components/finlit-ui';
+import { Field, Header, PrimaryButton, ProgressBar, Screen, SectionTitle, StudentShell, ToneCard } from '@/components/finlit-ui';
+import { useAuth } from '@/contexts/auth-context';
+import { authoredLessons } from '@/content/learning';
+import { useSampleProgress } from '@/hooks/use-sample-progress';
+import { useProfile } from '@/hooks/use-profile';
+import { useModules, useModule } from '@/hooks/use-modules';
+import { useLessons, useLesson } from '@/hooks/use-lessons';
+import { useCompleteLessonMutation, useLessonProgress, useUserLessonProgress } from '@/hooks/use-progress';
+import { describeSupabaseError } from '@/lib/supabase-diagnostics';
 
 function useRouter() {
   return useExpoRouter() as { push: (href: string) => void; back: () => void };
@@ -18,81 +24,364 @@ export function WelcomeView() {
   return <Screen><View style={styles.welcome}><Text style={styles.brand}>FINLIT</Text><View style={styles.hero}><Text style={styles.heroMark}>K</Text><View style={styles.heroDot} /></View><Text style={commonStyles.title}>Build better{`\n`}money habits</Text><Text style={[commonStyles.body, styles.welcomeBody]}>Short lessons. Practical decisions. Progress you can see.</Text><PrimaryButton title="Get started" onPress={() => router.push('/login')} /><Pressable onPress={() => router.push('/login')}><Text style={styles.centerLink}>Already have an account? Log in</Text></Pressable></View></Screen>;
 }
 
-export function LoginView() {
-  const router = useRouter();
-  const [email, setEmail] = useState('caleb@example.com');
-  const [password, setPassword] = useState('password');
-  return <Screen><Header title="Welcome back" back /><Text style={commonStyles.body}>Continue your financial learning journey.</Text><View style={styles.form}><Field label="Email address" value={email} onChangeText={setEmail} /><Field label="Password" value={password} onChangeText={setPassword} secureTextEntry /><Text style={styles.rightLink}>Forgot password?</Text><PrimaryButton title="Log in" onPress={() => router.push('/diagnostic')} /><Text style={styles.centerLink}>New here? <Text style={styles.boldLink}>Create account</Text></Text></View></Screen>;
-}
-
-export function DiagnosticView() {
-  const router = useRouter();
-  const [selected, setSelected] = useState('K200');
-  return <Screen><Header title="Knowledge assessment" back /><Text style={styles.step}>Question 4 of 16 · 25%</Text><ProgressBar value={25} /><Text style={styles.tag}>BUDGETING</Text><Text style={commonStyles.heading}>A student receives K1,500 and plans the following expenses. How much remains?</Text><ToneCard tone="blue" style={styles.equation}><Text style={styles.equationText}>Food K600 · Transport K300{`\n`}Data K150 · Books K250</Text></ToneCard>{['K100', 'K200', 'K300', 'K400'].map((option) => <Pressable key={option} onPress={() => setSelected(option)} style={[styles.option, selected === option && styles.selectedOption]}><Text style={styles.optionText}>{option}</Text></Pressable>)}<PrimaryButton title="Next question" onPress={() => router.push('/recommended')} /></Screen>;
-}
+export { LoginView } from '@/components/auth-views';
 
 export function RecommendedView() {
-  const router = useRouter();
-  return <Screen><View style={styles.bigIcon}><Ionicons name="git-branch-outline" size={48} color={palette.ink} /></View><Text style={[commonStyles.heading, styles.center]}>Your learning path is ready</Text><Text style={[commonStyles.body, styles.center]}>Start with budgeting, then build towards saving and responsible borrowing.</Text><View style={styles.scoreRow}>{[['42%', 'Budgeting'], ['63%', 'Income'], ['38%', 'Borrowing']].map(([value, label]) => <View key={label} style={styles.score}><Text style={styles.scoreValue}>{value}</Text><Text style={styles.scoreLabel}>{label}</Text></View>)}</View><ModuleCard title="Budgeting basics" subtitle="Recommended first" tone="blue" icon="bar-chart-3" onPress={() => router.push('/learn/module/budgeting')} /><ModuleCard title="Income management" subtitle="Next module" tone="mint" icon="wallet" /><ModuleCard title="Saving & emergencies" subtitle="Locked" tone="peach" icon="lock-keyhole" /><PrimaryButton title="Start learning" onPress={() => router.push('/learn')} /></Screen>;
+  return <Screen><Header title="Your learning path" back /><Text style={commonStyles.heading}>Build your money skills</Text><Text style={commonStyles.body}>Start with a lesson, practise a decision and continue at your own pace.</Text><SampleRecommendation /><CurriculumPlan /></Screen>;
 }
 
 export function HomeView() {
   const router = useRouter();
-  return <StudentShell><Screen><View style={styles.userBar}><View style={styles.avatar}><Text>CM</Text></View><View style={styles.userCopy}><Text style={styles.userName}>Caleb Manda</Text><Text style={commonStyles.label}>Student</Text></View><Ionicons name="notifications-outline" size={21} color={palette.ink} /></View><Text style={[commonStyles.title, styles.homeTitle]}>What will you{`\n`}master today?</Text><View style={styles.streak}><Text style={commonStyles.label}>🔥 4 day streak</Text><Text style={commonStyles.label}>35% complete</Text></View><ProgressBar value={35} /><Pressable onPress={() => router.push('/learn/lesson/budgeting')}><ToneCard tone="blush" style={styles.course}><Text style={styles.courseEyebrow}>CONTINUE · 6 MIN</Text><Text style={styles.courseTitle}>Building a budget</Text><Text style={styles.courseDetail}>Module 2</Text><View style={styles.courseArt}><Text style={styles.courseMark}>K</Text></View></ToneCard></Pressable><SectionTitle title="Your learning path" action="View all" /><View style={styles.miniModules}><ToneCard tone="mint" style={styles.mini}><Ionicons name="wallet-outline" size={20} /><Text>Income</Text></ToneCard><ToneCard tone="blue" style={styles.mini}><Ionicons name="bar-chart-outline" size={20} /><Text>Budgeting</Text></ToneCard></View></Screen></StudentShell>;
+  const { user } = useAuth();
+  const { profile } = useProfile();
+  const { modules: realModules, isLoading, error } = useModules();
+
+  // Get user initials from profile or email
+  const initials = profile?.full_name
+    ? profile.full_name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+    : user?.email?.[0]?.toUpperCase() || '?';
+
+  if (isLoading) {
+    return (
+      <StudentShell>
+        <Screen>
+          <View style={styles.userBar}>
+            <View style={styles.avatar}>
+              <Text>{initials}</Text>
+            </View>
+            <View style={styles.userCopy}>
+              <Text style={styles.userName}>{profile?.full_name || 'Student'}</Text>
+              <Text style={commonStyles.label}>Student</Text>
+            </View>
+            <Ionicons name="notifications-outline" size={21} color={palette.ink} />
+          </View>
+          <Text style={commonStyles.body}>Loading learning path...</Text>
+        </Screen>
+      </StudentShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <StudentShell>
+        <Screen>
+          <SampleRecommendation /><Text style={commonStyles.title}>Modules unavailable</Text>
+          <Text style={commonStyles.body}>{describeSupabaseError(error)}</Text>
+        </Screen>
+      </StudentShell>
+    );
+  }
+
+  return (
+    <StudentShell>
+      <Screen>
+        <View style={styles.userBar}>
+          <View style={styles.avatar}>
+            <Text>{initials}</Text>
+          </View>
+          <View style={styles.userCopy}>
+            <Text style={styles.userName}>{profile?.full_name || 'Student'}</Text>
+            <Text style={commonStyles.label}>Student</Text>
+          </View>
+          <Ionicons name="notifications-outline" size={21} color={palette.ink} />
+        </View>
+        <Text style={[commonStyles.title, styles.homeTitle]}>
+          What will you{`\n`}master today?
+        </Text>
+        <SampleRecommendation />
+        {realModules.length === 0 ? (
+          <Text style={commonStyles.body}>Learning modules are being prepared.</Text>
+        ) : (
+          <>
+            <View style={styles.streak}>
+              <Text style={commonStyles.label}>📚 {realModules.length} modules</Text>
+              <Text style={commonStyles.label}>Start learning</Text>
+            </View>
+            <SectionTitle title="Your learning path" action="View all" />
+            <View style={styles.miniModules}>
+              {realModules.slice(0, 2).map((module) => (
+                <Pressable key={module.id} onPress={() => router.push(`/learn/module/${module.id}`)}>
+                  <ToneCard tone="mint" style={styles.mini}>
+                    <Text style={styles.moduleTitle}>{module.title}</Text>
+                  </ToneCard>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
+      </Screen>
+    </StudentShell>
+  );
 }
 
 export function LearnView() {
   const router = useRouter();
-  return <StudentShell><Screen><Header title="Learning path" action={<Text style={styles.streakPill}>🔥 4</Text>} /><Text style={commonStyles.body}>Complete each module to unlock the next.</Text><View style={styles.moduleList}>{modules.map((item) => <ModuleCard key={item.id} title={item.title} subtitle={item.subtitle} tone={item.tone as 'mint' | 'blue' | 'peach' | 'lilac'} icon={item.icon} onPress={item.status === 'locked' ? undefined : () => router.push(`/learn/module/${item.id}`)} />)}</View></Screen></StudentShell>;
+  const { modules: realModules, isLoading, error } = useModules();
+  return <StudentShell><Screen><Header title="Learning path" />
+    <SampleRecommendation />
+    <Text style={commonStyles.heading}>More to learn</Text>
+    {isLoading ? <Text style={commonStyles.body}>Loading modules...</Text> : error ? <Text accessibilityRole="alert" style={commonStyles.body}>{describeSupabaseError(error)}</Text> : realModules.length === 0 ? <Text style={commonStyles.body}>Learning modules are being prepared.</Text> :
+      <View style={styles.moduleList}>{realModules.map(module => <Pressable key={module.id} onPress={() => router.push(`/learn/module/${module.id}`)}>
+        <View style={styles.moduleItem}><Text style={styles.moduleTitle}>{module.title}</Text><Text style={commonStyles.label}>{module.estimated_minutes} min</Text></View>
+      </Pressable>)}</View>}
+    <View style={{ marginTop: 28 }}><CurriculumPlan /></View>
+  </Screen></StudentShell>;
+}
+export function ModuleView({ moduleId }: { moduleId?: string }) {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { module, isLoading, error } = useModule(moduleId || null);
+  const { lessons, isLoading: lessonsLoading, error: lessonsError } = useLessons(moduleId || null);
+  const { progress, isLoading: progressLoading, error: userProgressError } = useUserLessonProgress(user?.id || null);
+
+  if (isLoading) {
+    return (
+      <Screen>
+        <Header title="Module details" back />
+        <Text style={commonStyles.body}>Loading module...</Text>
+      </Screen>
+    );
+  }
+
+  if (error || !module) {
+    return (
+      <Screen>
+        <Header title="Module details" back />
+        <Text style={commonStyles.title}>Module not found</Text>
+        <Text style={commonStyles.body}>{error ? describeSupabaseError(error) : 'This module is unavailable. Please return to your learning path.'}</Text>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen>
+      <Header title="Module details" back />
+      <ToneCard tone="mint" style={styles.wideArt}>
+        <Text style={styles.wideMark}>M</Text>
+      </ToneCard>
+      <Text style={commonStyles.heading}>{module.title}</Text>
+      <Text style={commonStyles.body}>{module.description}</Text>
+      <View style={styles.meta}>
+        <Text>
+          Beginner{`\n`}
+          <Text style={styles.metaLabel}>Level</Text>
+        </Text>
+        <Text>
+          {module.estimated_minutes} min{`\n`}
+          <Text style={styles.metaLabel}>Duration</Text>
+        </Text>
+        <Text>
+          {lessons.length}{`\n`}
+          <Text style={styles.metaLabel}>Lessons</Text>
+        </Text>
+      </View>
+      {userProgressError ? <Text style={styles.error}>{describeSupabaseError(userProgressError)}</Text> : null}
+      {lessonsError ? <Text style={styles.error}>{describeSupabaseError(lessonsError)}</Text> : lessonsLoading ? (
+        <Text style={commonStyles.body}>Loading lessons...</Text>
+      ) : lessons.length === 0 ? (
+        <Text style={commonStyles.body}>No lessons available in this module.</Text>
+      ) : (
+        <>
+          {lessons.map((lesson, index) => (
+            <View key={lesson.id} style={styles.stage}>
+              <View style={styles.stageNumber}>
+                <Text>{index + 1}</Text>
+              </View>
+              <View>
+                <Text style={styles.moduleTitle}>{lesson.title}</Text>
+                <Text style={commonStyles.label}>
+                  {progressLoading ? 'Loading progress...' : userProgressError ? 'Progress unavailable' : progress.some((item) => item.lesson_id === lesson.id && item.is_completed)
+                    ? 'Completed'
+                    : 'Available'}
+                </Text>
+              </View>
+            </View>
+          ))}
+          <PrimaryButton
+            title="Start module"
+            onPress={() => {
+              const firstLesson = lessons[0];
+              if (firstLesson) router.push(`/learn/lesson/${firstLesson.id}`);
+            }}
+          />
+        </>
+      )}
+    </Screen>
+  );
 }
 
-export function ModuleView() {
+export function LessonView({ lessonId }: { lessonId?: string }) {
   const router = useRouter();
-  return <Screen><Header title="Module details" back /><ToneCard tone="mint" style={styles.wideArt}><Text style={styles.wideMark}>K</Text><Ionicons name="bar-chart-outline" size={48} /></ToneCard><Text style={commonStyles.heading}>Building a budget</Text><Text style={commonStyles.body}>Organise income, plan essential expenses and make room for saving.</Text><View style={styles.meta}><Text>Beginner{`\n`}<Text style={styles.metaLabel}>Level</Text></Text><Text>20 min{`\n`}<Text style={styles.metaLabel}>Duration</Text></Text><Text>4{`\n`}<Text style={styles.metaLabel}>Stages</Text></Text></View>{['Short lesson', 'Student scenario', 'Budget activity', 'Short quiz'].map((stage, index) => <View key={stage} style={styles.stage}><View style={styles.stageNumber}><Text>{index + 1}</Text></View><View><Text style={styles.moduleTitle}>{stage}</Text><Text style={commonStyles.label}>{index === 0 ? 'Available' : 'Locked'}</Text></View></View>)}<PrimaryButton title="Continue module" onPress={() => router.push('/learn/lesson/budgeting')} /></Screen>;
-}
+  const { user } = useAuth();
+  const { lesson, isLoading, error } = useLesson(lessonId || null);
+  const { lessonProgress, isLoading: progressLoading, error: progressError } = useLessonProgress(user?.id || null, lessonId || null);
+  const { mutate: completeLesson, isLoading: isCompleting } = useCompleteLessonMutation();
+  const [completedKey, setCompletedKey] = useState('');
+  const [completionError, setCompletionError] = useState('');
+  const completionKey = JSON.stringify([user?.id, lessonId]);
+  const completed = completedKey === completionKey || Boolean(lessonProgress && lessonProgress.lesson_id === lessonId && lessonProgress.user_id === user?.id && lessonProgress.is_completed);
 
-export function LessonView() {
-  const router = useRouter();
-  return <Screen><Header title="Lesson 1 of 4" back /><ProgressBar value={25} /><ToneCard tone="blue" style={styles.lessonArt}><Ionicons name="book-outline" size={42} /></ToneCard><Text style={styles.tag}>BUDGETING BASICS</Text><Text style={commonStyles.heading}>What is a budget?</Text><Text style={styles.lessonText}>Lesson content will be added in a later phase. A budget is a simple plan for money coming in and going out.</Text><Text style={styles.subheading}>Start with reliable income</Text><Text style={styles.lessonText}>Use short, practical examples to understand the choices in front of you.</Text><ToneCard tone="lilac" style={styles.aiStrip}><Ionicons name="sparkles-outline" size={22} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>Need clarification?</Text><Text style={commonStyles.label}>Simple, detailed or example</Text></View><Pressable onPress={() => router.push('/learn/explanation')}><Text style={styles.boldLink}>Explain</Text></Pressable></ToneCard><PrimaryButton title="Complete lesson" onPress={() => router.push('/learn/scenario')} /></Screen>;
+
+
+  const handleComplete = async () => {
+    if (!user?.id || !lessonId || isCompleting || progressLoading || progressError) return;
+    setCompletionError('');
+    try {
+      await completeLesson(user.id, lessonId);
+      setCompletedKey(completionKey);
+    } catch (err) {
+      setCompletionError(describeSupabaseError(err));
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Screen>
+        <Header title="Lesson" back />
+        <Text style={commonStyles.body}>Loading lesson...</Text>
+      </Screen>
+    );
+  }
+
+  if (error || !lesson) {
+    return (
+      <Screen>
+        <Header title="Lesson" back />
+        <Text style={commonStyles.title}>Lesson not found</Text>
+        <Text style={commonStyles.body}>{error ? describeSupabaseError(error) : 'This lesson is unavailable. Please return to your learning path.'}</Text>
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen>
+      <Header title="Lesson" back />
+      <ToneCard tone="blue" style={styles.lessonArt}>
+        <Ionicons name="book-outline" size={42} />
+      </ToneCard>
+      <Text style={styles.tag}>{lesson.title.toUpperCase()}</Text>
+      <Text style={commonStyles.heading}>{lesson.title}</Text>
+      <Text style={styles.lessonText}>{lesson.summary || lesson.content}</Text>
+      {lesson.content && (
+        <>
+          <Text style={styles.subheading}>Details</Text>
+          <Text style={styles.lessonText}>{lesson.content}</Text>
+        </>
+      )}
+      {completionError ? <Text style={styles.error}>{completionError}</Text> : null}
+      {progressLoading ? <Text style={commonStyles.body}>Loading saved progress...</Text> : progressError ? <Text style={styles.error}>{describeSupabaseError(progressError)}</Text> : !completed ? (
+        <PrimaryButton
+          title={isCompleting ? 'Marking complete...' : 'Complete lesson'}
+          onPress={handleComplete}
+          disabled={isCompleting}
+        />
+      ) : (
+        <>
+          <View style={styles.bigIcon}>
+            <Ionicons name="checkmark-circle-outline" size={52} color={palette.teal} />
+          </View>
+          <Text style={[commonStyles.heading, styles.center]}>Lesson completed!</Text>
+          <PrimaryButton title="Back to module" onPress={() => router.back()} />
+        </>
+      )}
+    </Screen>
+  );
 }
 
 export function ExplanationView() {
   const router = useRouter();
-  const [mode, setMode] = useState('Simple');
-  return <Screen><Header title="Gemini clarification" back action={<Ionicons name="bookmark-outline" size={20} color={palette.ink} />} /><ToneCard tone="lilac" style={styles.aiHero}><Ionicons name="sparkles-outline" size={24} /><Text>Mock explanation based on the current lesson</Text></ToneCard><View style={styles.segment}>{['Simple', 'Detailed', 'Example'].map((item) => <Pressable key={item} onPress={() => setMode(item)} style={[styles.segmentItem, mode === item && styles.segmentSelected]}><Text>{item}</Text></Pressable>)}</View><Text style={commonStyles.heading}>What is a budget?</Text><Text style={styles.lessonText}>A budget is a plan for your money. First list the money you reasonably expect to receive, then plan important costs before optional spending.</Text><ToneCard tone="mint" style={styles.notice}><Ionicons name="shield-checkmark-outline" size={20} /><View><Text style={styles.moduleTitle}>Approved lesson context</Text><Text style={commonStyles.label}>No personal financial advice</Text></View></ToneCard><PrimaryButton title="Return to lesson" onPress={() => router.back()} /><Text style={styles.centerLink}>🔖 Saved automatically</Text></Screen>;
+  const [mode, setMode] = useState<'Simple' | 'Detailed' | 'Example'>('Simple');
+  const explanation = {
+    Simple: 'A budget is a plan for your money. List what you can use, then plan important costs before optional spending.',
+    Detailed: 'Choose a period, such as one month. Add the money available for that period and list each planned cost once. Subtract the costs from the money available. Review the plan when an amount changes.',
+    Example: 'Chipo has K1,500 for a fictional month. Food, transport, data and study materials total K1,300. Her plan leaves K200 before any new costs.',
+  };
+  return <Screen><Header title="Budget explained" back /><ToneCard tone="lilac" style={styles.aiHero}><Ionicons name="bulb-outline" size={24} /><Text style={styles.moduleTitle}>Understanding budgets</Text></ToneCard><View accessibilityRole="tablist" style={styles.segment}>{(['Simple', 'Detailed', 'Example'] as const).map(item => <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === item }} key={item} onPress={() => setMode(item)} style={[styles.segmentItem, mode === item && styles.segmentSelected]}><Text>{item}</Text></Pressable>)}</View><Text style={commonStyles.heading}>What is a budget?</Text><Text style={styles.lessonText}>{explanation[mode]}</Text><PrimaryButton title="Review budgeting lesson" onPress={() => router.push('/learn/lesson/sample-budgeting-1')} /><PrimaryButton title="Save explanation · Coming soon" tone="outline" disabled /></Screen>;
 }
 
-export function ScenarioView() {
+// Older activity links open the complete lesson, where responses and feedback stay together.
+function BudgetingLessonLink() { return <Redirect href="/learn/lesson/sample-budgeting-1" />; }
+export const ScenarioView = BudgetingLessonLink;
+export const FeedbackView = BudgetingLessonLink;
+export const ActivityView = BudgetingLessonLink;
+export const QuizView = BudgetingLessonLink;
+export const ResultView = BudgetingLessonLink;
+
+export function BudgetView() {
   const router = useRouter();
-  const [selected, setSelected] = useState(1);
-  const options = ['Borrow K100 and attend', 'Decline or find a cheaper option', 'Use money reserved for transport'];
-  return <Screen><Header title="Scenario" back /><ToneCard tone="peach" style={styles.wideArt}><Ionicons name="school-outline" size={44} /><Text style={styles.wideValue}>K1,500</Text></ToneCard><Text style={commonStyles.heading}>A difficult invitation</Text><Text style={commonStyles.body}>Example student scenario: Thandi has K200 left after essential expenses. Her friends invite her to an event costing K300.</Text><Text style={styles.subheading}>What should she do?</Text>{options.map((option, index) => <Pressable key={option} onPress={() => setSelected(index)} style={[styles.option, selected === index && styles.selectedOption]}><Text>{option}</Text></Pressable>)}<PrimaryButton title="Check decision" onPress={() => router.push('/learn/feedback')} /></Screen>;
+  const [extraExpenses, setExtraExpenses] = useState<number[]>([]);
+  const expenseTotal = 1620 + extraExpenses.reduce((total, amount) => total + amount, 0);
+  const available = 2400 - expenseTotal;
+  const money = (amount: number) => (amount < 0 ? '-K' : 'K') + Math.abs(amount).toLocaleString('en-ZM');
+  const examples = [
+    { id: 'allowance', title: 'Allowance', amount: 1500, income: true },
+    { id: 'work', title: 'Part-time work', amount: 900, income: true },
+    { id: 'food', title: 'Food', amount: 500, income: false },
+    { id: 'transport', title: 'Transport', amount: 320, income: false },
+    { id: 'materials', title: 'Study materials', amount: 360, income: false },
+    { id: 'data', title: 'Data & Wi-Fi', amount: 200, income: false },
+    { id: 'optional', title: 'Optional spending', amount: 240, income: false },
+    ...extraExpenses.map((amount, index) => ({ id: 'extra-' + index, title: 'Extra expense', amount, income: false })),
+  ];
+  return <StudentShell><Screen><Header title="Monthly budget" action={<Pressable accessibilityRole="button" accessibilityLabel="Explore an example entry" onPress={() => router.push('/budget/add')}><Ionicons name="add-circle-outline" size={25} color={palette.ink} /></Pressable>} /><Text style={commonStyles.heading}>Example budget</Text><Text style={commonStyles.body}>Explore a fictional month. Changes to this example reset when you leave.</Text><ToneCard tone="blush" style={styles.balance}><Text style={commonStyles.label}>AVAILABLE AFTER EXPENSES</Text><Text style={styles.balanceAmount}>{money(available)}</Text><Text style={commonStyles.label}>K2,400 income − {money(expenseTotal)} expenses</Text><ProgressBar value={Math.min(100, expenseTotal / 2400 * 100)} /></ToneCard><SectionTitle title="Example entries" />{examples.map(entry => <View key={entry.id} style={styles.entry}><Ionicons name={entry.income ? 'cash-outline' : 'cart-outline'} size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>{entry.title}</Text><Text style={commonStyles.label}>This example month</Text></View><Text style={[styles.moduleTitle, entry.income && styles.positive]}>{entry.income ? '+' : '-'}{money(entry.amount)}</Text></View>)}<PrimaryButton title="Try an extra K120 expense" onPress={() => setExtraExpenses(current => [...current, 120])} /><PrimaryButton title="View example breakdown" tone="outline" onPress={() => router.push('/budget/summary')} /><Text style={styles.noticeText}>Saving your own budget is coming soon.</Text></Screen></StudentShell>;
 }
 
-export function FeedbackView() { const router = useRouter(); return <Screen><View style={styles.bigIcon}><Ionicons name="checkmark-circle-outline" size={52} color={palette.teal} /></View><Text style={[commonStyles.heading, styles.center]}>Protecting essential expenses comes first</Text><Text style={[commonStyles.body, styles.center]}>Mock feedback: avoid creating debt or losing transport money.</Text><ToneCard tone="mint" style={styles.notice}><Ionicons name="bulb-outline" size={20} /><View><Text style={styles.moduleTitle}>Key principle</Text><Text style={commonStyles.label}>Separate essential and optional spending.</Text></View></ToneCard><PrimaryButton title="Continue to budget activity" onPress={() => router.push('/learn/activity')} /><PrimaryButton title="Try another choice" tone="outline" onPress={() => router.back()} /></Screen>; }
+export function AddEntryView() {
+  const [kind, setKind] = useState('Income');
+  const [amount, setAmount] = useState('500');
+  const [note, setNote] = useState('Family allowance');
+  const [category, setCategory] = useState('Allowance');
+  const [repeats, setRepeats] = useState(false);
+  return <Screen><Header title="Example entry" back /><Text style={commonStyles.body}>Explore the details of a budget entry. Saving personal entries is coming soon.</Text><View style={styles.segment}>{['Income', 'Expense'].map(item => <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: kind === item }} onPress={() => setKind(item)} style={[styles.segmentItem, kind === item && styles.segmentSelected]}><Text>{item}</Text></Pressable>)}</View><Field label="Amount (K)" value={amount} onChangeText={setAmount} /><Field label="Category" value={category} onChangeText={setCategory} /><Field label="Source or note" value={note} onChangeText={setNote} /><Pressable accessibilityRole="checkbox" accessibilityState={{ checked: repeats }} style={styles.checkbox} onPress={() => setRepeats(value => !value)}><Ionicons name={repeats ? 'checkbox' : 'square-outline'} size={20} color={palette.ink} /><Text>Repeats each month</Text></Pressable><ToneCard tone="mint" style={styles.notice}><Ionicons name="repeat-outline" size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>{kind === 'Income' ? 'Plan money coming in' : 'Plan a cost'}</Text><Text style={commonStyles.label}>Use the same period for your income and expenses.</Text></View></ToneCard><PrimaryButton title="Save entry · Coming soon" disabled /></Screen>;
+}
 
-export function ActivityView() { const router = useRouter(); return <Screen><Header title="Practical activity" back /><Text style={commonStyles.heading}>Build Thandi’s budget</Text><Text style={commonStyles.body}>Place each item in the correct category and check the remaining balance.</Text><ToneCard tone="blue" style={styles.budgetSummary}><Text style={commonStyles.label}>Income</Text><Text style={styles.amount}>K1,500</Text><Text style={commonStyles.label}>Expenses entered: K1,300</Text></ToneCard>{[['restaurant-outline', 'Food', 'K600'], ['bus-outline', 'Transport', 'K300'], ['wifi-outline', 'Data', 'K150'], ['book-outline', 'Books', 'K250']].map(([icon, title, amount]) => <View key={title} style={styles.entry}><Ionicons name={icon as never} size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>{title}</Text><Text style={commonStyles.label}>Essential</Text></View><Text style={styles.moduleTitle}>{amount}</Text></View>)}<View style={styles.total}><Text>Remaining balance</Text><Text style={styles.amount}>K200</Text></View><PrimaryButton title="Complete activity" onPress={() => router.push('/learn/quiz')} /></Screen>; }
+export function BudgetSummaryView() {
+  const router = useRouter();
+  return <Screen><Header title="Budget breakdown" back /><Text style={commonStyles.heading}>An example month</Text><Text style={commonStyles.body}>The original example has K2,400 income and K1,620 planned expenses.</Text><View style={styles.donut}><View style={styles.donutInner}><Text style={styles.moduleTitle}>K1,620</Text><Text style={commonStyles.label}>Total expenses</Text></View></View>{[['Essentials', 'K1,180', palette.teal], ['Optional', 'K240', '#dca5be'], ['Data & Wi-Fi', 'K200', '#e7b65e']].map(([title, amount, color]) => <View key={title} style={styles.legend}><View style={[styles.dot, { backgroundColor: color }]} /><Text style={{ flex: 1 }}>{title}</Text><Text style={styles.moduleTitle}>{amount}</Text></View>)}<View style={styles.total}><Text>Unallocated balance</Text><Text style={styles.amount}>K780</Text></View><PrimaryButton title="Explore an example entry" tone="outline" onPress={() => router.push('/budget/add')} /><Text style={styles.noticeText}>Your personal spending breakdown is coming soon.</Text></Screen>;
+}
 
-export function QuizView() { const router = useRouter(); const [selected, setSelected] = useState(1); return <Screen><Header title="Question 3 of 5" back /><ProgressBar value={60} /><Text style={styles.tag}>SHORT QUIZ</Text><Text style={commonStyles.heading}>Placeholder quiz question</Text><Text style={commonStyles.body}>Which expense should normally be prioritised?</Text>{quizOptions.map((option, index) => <Pressable key={option} onPress={() => setSelected(index)} style={[styles.option, selected === index && styles.selectedOption]}><Text style={styles.optionLetter}>{String.fromCharCode(65 + index)}</Text><Text>{option}</Text></Pressable>)}<PrimaryButton title="Submit answer" onPress={() => router.push('/learn/result')} /></Screen>; }
+export function ProgressView() {
+  const { user } = useAuth();
+  const { progress, isLoading, error } = useUserLessonProgress(user?.id ?? null);
+  const local = useSampleProgress();
+  const completedIds = new Set(progress.filter(lesson => lesson.is_completed).map(lesson => lesson.lesson_id));
+  for (const lesson of authoredLessons) if (local.progress.lessons[lesson.id]?.completed) completedIds.add(lesson.id);
+  const completed = completedIds.size;
+  return <StudentShell><Screen><Header title="Your progress" /><SampleRecommendation /><SectionTitle title="Completed lessons" />{isLoading || local.loading ? <Text style={commonStyles.body}>Loading your progress...</Text> : error || local.error ? <Text accessibilityRole="alert" style={styles.error}>{error ? describeSupabaseError(error) : local.error}</Text> : <ToneCard tone="mint"><Text style={styles.moduleTitle}>{completed} completed {completed === 1 ? 'lesson' : 'lessons'}</Text><Text style={commonStyles.body}>{completed ? 'Keep building on what you have learned.' : 'Complete a lesson to start building your learning record.'}</Text></ToneCard>}<Text style={[commonStyles.body, { marginTop: spacing.md }]}>Badges and learning streaks are coming soon.</Text></Screen></StudentShell>;
+}
 
-export function ResultView() { const router = useRouter(); return <Screen><View style={styles.resultRing}><Text style={styles.resultValue}>80%</Text></View><Text style={[commonStyles.heading, styles.center]}>Module passed!</Text><Text style={[commonStyles.body, styles.center]}>Mock result. You can continue to Saving and Emergency Planning.</Text><View style={styles.scoreRow}>{[['4/5', 'Correct'], ['1', 'Attempt'], ['+1', 'Badge']].map(([value, label]) => <View key={label} style={styles.score}><Text style={styles.scoreValue}>{value}</Text><Text style={styles.scoreLabel}>{label}</Text></View>)}</View><ToneCard tone="lilac" style={styles.notice}><Ionicons name="ribbon-outline" size={22} /><View><Text style={styles.moduleTitle}>Budget Builder</Text><Text style={commonStyles.label}>New badge earned</Text></View></ToneCard><PrimaryButton title="Unlock next module" onPress={() => router.push('/progress')} /><PrimaryButton title="Review answers" tone="outline" onPress={() => router.push('/learn/quiz')} /></Screen>; }
+export function SavedExplanationsView() {
+  const router = useRouter();
+  return <StudentShell><Screen><Header title="Saved explanations" back /><ToneCard tone="lilac" style={styles.notice}><Ionicons name="bookmark-outline" size={24} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>Save explanations for later</Text><Text style={commonStyles.body}>Coming soon. For now, reopen a lesson to review its definitions and examples.</Text></View></ToneCard><PrimaryButton title="Explore lessons" onPress={() => router.push('/learn')} /></Screen></StudentShell>;
+}
 
-export function BudgetView() { const router = useRouter(); const [localEntries, setLocalEntries] = useState(entries); return <StudentShell><Screen><Header title="Monthly budget" action={<Pressable onPress={() => router.push('/budget/add')}><Ionicons name="add-circle-outline" size={25} color={palette.ink} /></Pressable>} /><Text style={commonStyles.body}>Recurring entries included automatically.</Text><ToneCard tone="blush" style={styles.balance}><Text style={commonStyles.label}>AVAILABLE AFTER EXPENSES</Text><Text style={styles.balanceAmount}>K780</Text><Text style={commonStyles.label}>K2,400 income − K1,620 expenses</Text><ProgressBar value={55} /></ToneCard><SectionTitle title="Recent entries" action="View all" />{localEntries.map((entry) => <View key={entry.id} style={styles.entry}><Ionicons name={entry.type === 'income' ? 'cash-outline' : 'cart-outline'} size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>{entry.title}</Text><Text style={commonStyles.label}>{entry.detail}</Text></View><Text style={[styles.moduleTitle, entry.type === 'income' && styles.positive]}>{entry.amount}</Text></View>)}<PrimaryButton title="Add mock entry" onPress={() => setLocalEntries((current) => [...current, { id: 'mock', title: 'Mock saving', detail: 'Just this session', amount: '-K120', type: 'expense' }])} /><PrimaryButton title="View budget breakdown" tone="outline" onPress={() => router.push('/budget/summary')} /></Screen></StudentShell>; }
-
-export function AddEntryView() { const router = useRouter(); const [kind, setKind] = useState('Income'); const [amount, setAmount] = useState('500'); return <Screen><Header title="Add entry" back /><View style={styles.segment}>{['Income', 'Expense'].map((item) => <Pressable key={item} onPress={() => setKind(item)} style={[styles.segmentItem, kind === item && styles.segmentSelected]}><Text>{item}</Text></Pressable>)}</View><Field label="Amount (K)" value={amount} onChangeText={setAmount} /><Field label="Category" value={kind === 'Income' ? 'Allowance' : 'Transport'} /><Field label="Source or note" value="Family allowance" /><Field label="Date" value="2026-09-13" /><View style={styles.checkbox}><Ionicons name="checkbox" size={20} color={palette.ink} /><Text>This entry repeats</Text></View><ToneCard tone="mint" style={styles.notice}><Ionicons name="repeat-outline" size={20} /><View><Text style={styles.moduleTitle}>Monthly estimate</Text><Text style={commonStyles.label}>Mock value will be included this session.</Text></View></ToneCard><PrimaryButton title="Save entry" onPress={() => router.back()} /></Screen>; }
-
-export function BudgetSummaryView() { const router = useRouter(); return <Screen><Header title="Budget breakdown" back /><Text style={commonStyles.heading}>September</Text><View style={styles.donut}><View style={styles.donutInner}><Text style={styles.moduleTitle}>K1,620</Text><Text style={commonStyles.label}>Total expenses</Text></View></View>{[['Essentials', 'K1,180', palette.teal], ['Optional', 'K240', '#dca5be'], ['Data & Wi-Fi', 'K200', '#e7b65e']].map(([title, amount, color]) => <View key={title} style={styles.legend}><View style={[styles.dot, { backgroundColor: color }]} /><Text style={{ flex: 1 }}>{title}</Text><Text style={styles.moduleTitle}>{amount}</Text></View>)}<View style={styles.total}><Text>Savings rate</Text><Text style={styles.amount}>12%</Text></View><PrimaryButton title="Edit monthly entries" tone="outline" onPress={() => router.push('/budget/add')} /></Screen>; }
-
-export function LoanView() { const router = useRouter(); const [mode, setMode] = useState('Use saved budget'); return <StudentShell><Screen><Header title="Loan affordability" action={<Ionicons name="information-circle-outline" size={21} color={palette.ink} />} /><Text style={commonStyles.body}>Estimate repayment pressure before taking a loan.</Text><View style={styles.segment}>{['Use saved budget', 'Enter manually'].map((item) => <Pressable key={item} onPress={() => setMode(item)} style={[styles.segmentItem, mode === item && styles.segmentSelected]}><Text style={{ fontSize: 11 }}>{item}</Text></Pressable>)}</View><View style={styles.sourcePair}><ToneCard tone="mint"><Text style={commonStyles.label}>Income</Text><Text style={styles.moduleTitle}>K2,400</Text></ToneCard><ToneCard tone="mint"><Text style={commonStyles.label}>Essential expenses</Text><Text style={styles.moduleTitle}>K1,300</Text></ToneCard></View><Field label="Loan amount (K)" value="1800" /><Field label="Interest rate (%)" value="12" /><Field label="Repayment period" value="6 months" /><PrimaryButton title="Calculate affordability" onPress={() => router.push('/loan/result')} /></Screen></StudentShell>; }
-
-export function LoanResultView() { const router = useRouter(); return <Screen><Header title="Affordability result" back /><View style={styles.bigIcon}><Ionicons name="speedometer-outline" size={50} color={palette.warning} /></View><Text style={[styles.tag, styles.center]}>MODERATE PRESSURE</Text><Text style={[commonStyles.heading, styles.center]}>Review the repayment carefully</Text>{[['Monthly repayment', 'K336'], ['Total repayment', 'K2,016'], ['After essentials', 'K764'], ['Repayment-to-income', '14%']].map(([label, value]) => <View key={label} style={styles.resultLine}><Text>{label}</Text><Text style={styles.moduleTitle}>{value}</Text></View>)}<Text style={styles.noticeText}>This is an educational mock estimate, not personalised financial advice.</Text><PrimaryButton title="Save result" onPress={() => router.push('/progress')} /><PrimaryButton title="Change loan details" tone="outline" onPress={() => router.back()} /></Screen>; }
-
-export function ProgressView() { const router = useRouter(); return <StudentShell><Screen><Header title="Your progress" action={<Text style={styles.streakPill}>🔥 4 days</Text>} /><View style={styles.scoreRow}>{[['1', 'Completed'], ['78%', 'Quiz average'], ['2', 'Badges']].map(([value, label]) => <View key={label} style={styles.score}><Text style={styles.scoreValue}>{value}</Text><Text style={styles.scoreLabel}>{label}</Text></View>)}</View><SectionTitle title="Learning progress" action="35%" /><ProgressBar value={35} /><View style={styles.chart}>{[42, 64, 78, 56, 86].map((height, index) => <View key={index} style={[styles.chartBar, { height: `${height}%` }]} />)}</View><ToneCard tone="lilac" style={styles.notice}><Ionicons name="ribbon-outline" size={22} /><View><Text style={styles.moduleTitle}>Budget Builder</Text><Text style={commonStyles.label}>Latest achievement</Text></View></ToneCard><PrimaryButton title="Saved explanations" onPress={() => router.push('/saved-explanations')} /></Screen></StudentShell>; }
-
-export function SavedExplanationsView() { return <StudentShell><Screen><Header title="Saved explanations" back action={<Text style={styles.streakPill}>3</Text>} /><Text style={commonStyles.body}>Mock Gemini clarifications saved from your lessons.</Text>{savedExplanations.map((item) => <View key={item} style={styles.savedItem}><Ionicons name="sparkles-outline" size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>{item}</Text><Text style={commonStyles.label}>Budgeting basics · Simple</Text></View><Ionicons name="chevron-forward" size={17} color={palette.muted} /></View>)}<ToneCard tone="mint" style={styles.notice}><Ionicons name="server-outline" size={20} /><View><Text style={styles.moduleTitle}>Storage controlled</Text><Text style={commonStyles.label}>Items are placeholders and reset on reload.</Text></View></ToneCard></Screen></StudentShell>; }
-
-export function ProfileView() { const router = useRouter(); return <StudentShell><Screen><View style={styles.profile}><View style={styles.profileAvatar}><Text>CM</Text></View><Text style={commonStyles.heading}>Caleb Manda</Text><Text style={commonStyles.body}>Student account</Text></View>{[['notifications-outline', 'Learning reminders', 'Daily at 18:00'], ['ribbon-outline', 'Badges', '2 achievements earned'], ['bookmark-outline', 'Saved explanations', '3 saved items'], ['shield-checkmark-outline', 'Privacy and security', 'Password and data controls']].map(([icon, title, detail]) => <Pressable key={title} style={styles.savedItem}><Ionicons name={icon as never} size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>{title}</Text><Text style={commonStyles.label}>{detail}</Text></View><Ionicons name="chevron-forward" size={17} color={palette.muted} /></Pressable>)}<PrimaryButton title="Log out" tone="outline" onPress={() => router.push('/')} /></Screen></StudentShell>; }
+export function ProfileView() {
+  const router = useRouter();
+  const { signOut, user } = useAuth();
+  const { profile, isLoading, error } = useProfile();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
+  const initials = (profile?.full_name ?? user?.email ?? 'U').slice(0, 2).toUpperCase();
+  const logOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true); setSignOutError('');
+    try {
+      const result = await signOut();
+      if (result.error) setSignOutError('We could not log you out. Please try again.');
+    } catch { setSignOutError('We could not log you out. Please try again.'); }
+    finally { setIsSigningOut(false); }
+  };
+  return <StudentShell><Screen><View style={styles.profile}><View style={styles.profileAvatar}><Text>{initials}</Text></View><Text style={commonStyles.heading}>{profile?.full_name ?? 'Your profile'}</Text><Text style={commonStyles.body}>{user?.email ?? 'Your account'}</Text></View>{isLoading ? <Text style={commonStyles.body}>Loading profile...</Text> : null}{error ? <Text accessibilityRole="alert" style={styles.error}>{describeSupabaseError(error, 'Your profile could not be loaded. Please try again.')}</Text> : null}<Pressable accessibilityRole="button" style={styles.savedItem} onPress={() => router.push('/progress')}><Ionicons name="bar-chart-outline" size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>Learning progress</Text><Text style={commonStyles.label}>Review your lessons</Text></View><Ionicons name="chevron-forward" size={17} color={palette.muted} /></Pressable><Pressable accessibilityRole="button" style={styles.savedItem} onPress={() => router.push('/saved-explanations')}><Ionicons name="bookmark-outline" size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>Saved explanations</Text><Text style={commonStyles.label}>Coming soon</Text></View><Ionicons name="chevron-forward" size={17} color={palette.muted} /></Pressable><View style={styles.savedItem}><Ionicons name="notifications-outline" size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>Learning reminders</Text><Text style={commonStyles.label}>Coming soon</Text></View></View>{signOutError ? <Text accessibilityRole="alert" style={styles.error}>{signOutError}</Text> : null}<PrimaryButton title={isSigningOut ? 'Logging out...' : 'Log out'} tone="outline" disabled={isSigningOut} onPress={() => { void logOut(); }} /></Screen></StudentShell>;
+}
 
 const styles = StyleSheet.create({
-  welcome: { flex: 1, justifyContent: 'flex-end', paddingBottom: 28 }, brand: { position: 'absolute', top: 20, left: 0, color: palette.ink, fontSize: 13, letterSpacing: 3 }, hero: { alignSelf: 'center', width: 215, height: 215, marginBottom: spacing.xl, borderRadius: 110, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center' }, heroMark: { color: palette.ink, fontSize: 48, fontWeight: '500', transform: [{ rotate: '8deg' }], backgroundColor: palette.blue, paddingHorizontal: 35, paddingVertical: 15, borderRadius: 18 }, heroDot: { position: 'absolute', right: 24, top: 30, width: 38, height: 38, borderRadius: 20, backgroundColor: '#e7b65e' }, welcomeBody: { marginTop: 12, marginBottom: 16 }, centerLink: { color: palette.muted, textAlign: 'center', fontSize: 11, marginTop: 15 }, boldLink: { color: palette.ink, fontWeight: '500' }, form: { marginTop: spacing.xl }, rightLink: { color: palette.muted, fontSize: 11, textAlign: 'right', marginVertical: 2 }, step: { color: palette.muted, fontSize: 11, marginBottom: 8 }, tag: { alignSelf: 'flex-start', color: palette.ink, backgroundColor: palette.blush, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 6, fontSize: 10, letterSpacing: 1, marginVertical: spacing.md }, equation: { marginVertical: spacing.md, alignItems: 'center' }, equationText: { color: palette.ink, fontSize: 13, lineHeight: 22, textAlign: 'center' }, option: { minHeight: 48, borderRadius: radii.sm, borderWidth: 1, borderColor: '#d9d4d6', paddingHorizontal: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }, selectedOption: { borderColor: palette.ink, backgroundColor: palette.lilac }, optionText: { fontSize: 13, color: palette.ink }, optionLetter: { width: 25, height: 25, borderRadius: 13, textAlign: 'center', paddingTop: 4, backgroundColor: '#ece8ea' }, bigIcon: { alignSelf: 'center', width: 114, height: 114, marginTop: 42, marginBottom: 15, borderRadius: 36, backgroundColor: palette.lilac, alignItems: 'center', justifyContent: 'center' }, center: { textAlign: 'center' }, scoreRow: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, borderColor: palette.line, paddingVertical: 14, marginVertical: spacing.md }, score: { flex: 1, alignItems: 'center' }, scoreValue: { color: palette.ink, fontSize: 18, fontWeight: '500' }, scoreLabel: { color: palette.muted, fontSize: 10, marginTop: 3 }, userBar: { flexDirection: 'row', alignItems: 'center', gap: 10 }, avatar: { width: 38, height: 38, borderRadius: 20, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center' }, userCopy: { flex: 1 }, userName: { color: palette.ink, fontSize: 13, fontWeight: '500' }, homeTitle: { marginTop: 24 }, streak: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8 }, course: { minHeight: 188, marginTop: 18, overflow: 'hidden' }, courseEyebrow: { color: palette.muted, fontSize: 9 }, courseTitle: { position: 'absolute', left: 16, bottom: 28, color: palette.ink, fontSize: 18, fontWeight: '500' }, courseDetail: { position: 'absolute', left: 16, bottom: 12, color: palette.muted, fontSize: 10 }, courseArt: { position: 'absolute', right: 24, top: 48, width: 112, height: 72, borderRadius: 16, backgroundColor: palette.teal, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '7deg' }] }, courseMark: { fontSize: 38, color: palette.ink }, miniModules: { flexDirection: 'row', gap: 9 }, mini: { flex: 1, minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 7 }, streakPill: { color: palette.ink, backgroundColor: palette.peach, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 7, fontSize: 10 }, moduleList: { marginTop: spacing.lg }, wideArt: { minHeight: 155, marginBottom: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 22 }, wideMark: { fontSize: 30, backgroundColor: palette.blush, paddingHorizontal: 25, paddingVertical: 10, borderRadius: 13, transform: [{ rotate: '7deg' }] }, meta: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 14, paddingVertical: 11, borderTopWidth: 1, borderBottomWidth: 1, borderColor: palette.line, textAlign: 'center' }, metaLabel: { color: palette.muted, fontSize: 9 }, stage: { minHeight: 53, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderColor: palette.line }, stageNumber: { width: 29, height: 29, borderRadius: 15, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' }, lessonArt: { minHeight: 110, alignItems: 'center', justifyContent: 'center', marginVertical: 12 }, lessonText: { color: palette.muted, fontSize: 13, lineHeight: 20, marginBottom: 12 }, subheading: { color: palette.ink, fontSize: 14, fontWeight: '500', marginTop: 6, marginBottom: 5 }, aiStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 12 }, aiHero: { flexDirection: 'row', alignItems: 'center', gap: 10 }, segment: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: radii.pill, backgroundColor: '#ece8ea', marginVertical: 16 }, segmentItem: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill }, segmentSelected: { backgroundColor: palette.surface }, notice: { flexDirection: 'row', alignItems: 'center', gap: 9, marginVertical: 14 }, budgetSummary: { marginVertical: 12 }, amount: { color: palette.ink, fontSize: 25, fontWeight: '500' }, entry: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderColor: palette.line }, total: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#ece8ea', borderRadius: 14, marginVertical: 14 }, balance: { marginVertical: 16 }, balanceAmount: { color: palette.ink, fontSize: 30, fontWeight: '500', marginVertical: 5 }, positive: { color: '#367668' }, checkbox: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 38 }, donut: { alignSelf: 'center', width: 170, height: 170, borderRadius: 90, marginVertical: 14, backgroundColor: palette.teal, alignItems: 'center', justifyContent: 'center' }, donutInner: { width: 112, height: 112, borderRadius: 60, backgroundColor: palette.canvas, alignItems: 'center', justifyContent: 'center' }, legend: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8 }, dot: { width: 9, height: 9, borderRadius: 5 }, sourcePair: { flexDirection: 'row', gap: 8, marginVertical: 13 }, resultLine: { minHeight: 40, paddingVertical: 10, borderBottomWidth: 1, borderColor: palette.line, flexDirection: 'row', justifyContent: 'space-between' }, noticeText: { color: palette.muted, backgroundColor: '#ece8ea', padding: 11, borderRadius: 13, fontSize: 12, lineHeight: 17, marginVertical: 10 }, resultRing: { alignSelf: 'center', width: 142, height: 142, borderRadius: 72, borderWidth: 15, borderColor: palette.teal, marginTop: 45, marginBottom: 18, alignItems: 'center', justifyContent: 'center' }, resultValue: { color: palette.ink, fontSize: 30, fontWeight: '500' }, chart: { height: 130, marginVertical: 15, borderBottomWidth: 1, borderColor: '#cfc9cc', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', paddingHorizontal: 15 }, chartBar: { width: 25, borderRadius: 8, backgroundColor: '#dca5be' }, savedItem: { minHeight: 65, flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderColor: palette.line }, profile: { alignItems: 'center', marginVertical: 24 }, profileAvatar: { width: 78, height: 78, borderRadius: 40, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  error: { color: '#a44a4a', fontSize: 13, lineHeight: 19, marginTop: spacing.sm },
+  moduleTitle: { color: palette.ink, fontSize: 13, fontWeight: '500' },
+  moduleItem: { padding: spacing.md, borderRadius: radii.md, backgroundColor: palette.mint, marginBottom: spacing.sm },
+  wideValue: { color: palette.ink, fontSize: 24, fontWeight: '500' },
+  welcome: { flex: 1, justifyContent: 'flex-end', paddingBottom: 28 }, brand: { position: 'absolute', top: 20, left: 0, color: palette.ink, fontSize: 13, letterSpacing: 3 }, hero: { alignSelf: 'center', width: 215, height: 215, marginBottom: spacing.xl, borderRadius: 110, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center' }, heroMark: { color: palette.ink, fontSize: 48, fontWeight: '500', transform: [{ rotate: '8deg' }], backgroundColor: palette.blue, paddingHorizontal: 35, paddingVertical: 15, borderRadius: 18 }, heroDot: { position: 'absolute', right: 24, top: 30, width: 38, height: 38, borderRadius: 20, backgroundColor: '#e7b65e' }, welcomeBody: { marginTop: 12, marginBottom: 16 }, centerLink: { color: palette.muted, textAlign: 'center', fontSize: 11, marginTop: 15 }, boldLink: { color: palette.ink, fontWeight: '500' }, form: { marginTop: spacing.xl }, rightLink: { color: palette.muted, fontSize: 11, textAlign: 'right', marginVertical: 2 }, step: { color: palette.muted, fontSize: 11, marginBottom: 8 }, tag: { alignSelf: 'flex-start', color: palette.ink, backgroundColor: palette.blush, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 6, fontSize: 10, letterSpacing: 1, marginVertical: spacing.md }, equation: { marginVertical: spacing.md, alignItems: 'center' }, equationText: { color: palette.ink, fontSize: 13, lineHeight: 22, textAlign: 'center' }, option: { minHeight: 48, borderRadius: radii.sm, borderWidth: 1, borderColor: '#d9d4d6', paddingHorizontal: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }, selectedOption: { borderColor: palette.ink, backgroundColor: palette.lilac }, optionText: { fontSize: 13, color: palette.ink }, optionLetter: { width: 25, height: 25, borderRadius: 13, textAlign: 'center', paddingTop: 4, backgroundColor: '#ece8ea' }, bigIcon: { alignSelf: 'center', width: 114, height: 114, marginTop: 42, marginBottom: 15, borderRadius: 36, backgroundColor: palette.lilac, alignItems: 'center', justifyContent: 'center' }, center: { textAlign: 'center' }, scoreRow: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, borderColor: palette.line, paddingVertical: 14, marginVertical: spacing.md }, score: { flex: 1, alignItems: 'center' }, scoreValue: { color: palette.ink, fontSize: 18, fontWeight: '500' }, scoreLabel: { color: palette.muted, fontSize: 10, marginTop: 3 }, userBar: { flexDirection: 'row', alignItems: 'center', gap: 10 }, avatar: { width: 38, height: 38, borderRadius: 20, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center' }, userCopy: { flex: 1 }, userName: { color: palette.ink, fontSize: 13, fontWeight: '500' }, homeTitle: { marginTop: 24 }, streak: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8 }, course: { minHeight: 188, marginTop: 18, overflow: 'hidden' }, courseEyebrow: { color: palette.muted, fontSize: 9 }, courseTitle: { position: 'absolute', left: 16, bottom: 28, color: palette.ink, fontSize: 18, fontWeight: '500' }, courseDetail: { position: 'absolute', left: 16, bottom: 12, color: palette.muted, fontSize: 10 }, courseArt: { position: 'absolute', right: 24, top: 48, width: 112, height: 72, borderRadius: 16, backgroundColor: palette.teal, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '7deg' }] }, courseMark: { fontSize: 38, color: palette.ink }, miniModules: { flexDirection: 'row', gap: 9 }, mini: { flex: 1, minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 7 }, streakPill: { color: palette.ink, backgroundColor: palette.peach, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 7, fontSize: 10 }, moduleList: { marginTop: spacing.lg }, wideArt: { minHeight: 155, marginBottom: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 22 }, wideMark: { fontSize: 30, backgroundColor: palette.blush, paddingHorizontal: 25, paddingVertical: 10, borderRadius: 13, transform: [{ rotate: '7deg' }] }, meta: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 14, paddingVertical: 11, borderTopWidth: 1, borderBottomWidth: 1, borderColor: palette.line, textAlign: 'center' }, metaLabel: { color: palette.muted, fontSize: 9 }, stage: { minHeight: 53, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderColor: palette.line }, stageNumber: { width: 29, height: 29, borderRadius: 15, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' }, lessonArt: { minHeight: 110, alignItems: 'center', justifyContent: 'center', marginVertical: 12 }, lessonText: { color: palette.muted, fontSize: 13, lineHeight: 20, marginBottom: 12 }, subheading: { color: palette.ink, fontSize: 14, fontWeight: '500', marginTop: 6, marginBottom: 5 }, aiStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 12 }, aiHero: { flexDirection: 'row', alignItems: 'center', gap: 10 }, segment: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: radii.pill, backgroundColor: '#ece8ea', marginVertical: 16 }, segmentItem: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill }, segmentSelected: { backgroundColor: palette.surface }, notice: { flexDirection: 'row', alignItems: 'center', gap: 9, marginVertical: 14 }, budgetSummary: { marginVertical: 12 }, amount: { color: palette.ink, fontSize: 25, fontWeight: '500' }, entry: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderColor: palette.line }, total: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#ece8ea', borderRadius: 14, marginVertical: 14 }, balance: { marginVertical: 16 }, balanceAmount: { color: palette.ink, fontSize: 30, fontWeight: '500', marginVertical: 5 }, positive: { color: '#367668' }, checkbox: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 38 }, donut: { alignSelf: 'center', width: 170, height: 170, borderRadius: 90, marginVertical: 14, backgroundColor: palette.teal, alignItems: 'center', justifyContent: 'center' }, donutInner: { width: 112, height: 112, borderRadius: 60, backgroundColor: palette.canvas, alignItems: 'center', justifyContent: 'center' }, legend: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8 }, dot: { width: 9, height: 9, borderRadius: 5 }, noticeText: { color: palette.muted, backgroundColor: '#ece8ea', padding: 11, borderRadius: 13, fontSize: 12, lineHeight: 17, marginVertical: 10 }, resultRing: { alignSelf: 'center', width: 142, height: 142, borderRadius: 72, borderWidth: 15, borderColor: palette.teal, marginTop: 45, marginBottom: 18, alignItems: 'center', justifyContent: 'center' }, resultValue: { color: palette.ink, fontSize: 30, fontWeight: '500' }, chart: { height: 130, marginVertical: 15, borderBottomWidth: 1, borderColor: '#cfc9cc', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', paddingHorizontal: 15 }, chartBar: { width: 25, borderRadius: 8, backgroundColor: '#dca5be' }, savedItem: { minHeight: 65, flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderColor: palette.line }, profile: { alignItems: 'center', marginVertical: 24 }, profileAvatar: { width: 78, height: 78, borderRadius: 40, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
 });

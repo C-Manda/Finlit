@@ -11,6 +11,7 @@ export const palette = {
   blue: '#dce8f1',
   peach: '#f1dfd3',
   lilac: '#e4def1',
+  purple: '#59378a',
   teal: '#6eaaa0',
   warning: '#d89a70',
 };

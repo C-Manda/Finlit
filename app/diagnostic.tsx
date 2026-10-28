@@ -1,3 +1,3 @@
-import { DiagnosticView } from '@/components/screen-views';
+import { DiagnosticIntroView } from '@/components/assessment-views';
 
-export default DiagnosticView;
+export default DiagnosticIntroView;
