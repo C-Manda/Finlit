@@ -16,6 +16,7 @@ const fakePassword = 'Finlit-Test-123!';
 const user = { id: '00000000-0000-4000-8000-000000000001', email: fakeEmail, aud: 'authenticated', role: 'authenticated', app_metadata: { provider: 'email' }, user_metadata: { full_name: 'Finlit Learner' }, identities: [], created_at: '2026-01-01T00:00:00Z' };
 const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
 const jwt = encode({ alg: 'HS256', typ: 'JWT' }) + '.' + encode({ sub: user.id, email: fakeEmail, role: 'authenticated', aud: 'authenticated', exp: Math.floor(Date.now()/1000)+3600, iat: Math.floor(Date.now()/1000) }) + '.' + Buffer.from('fixture-only-signature').toString('base64url');
+let initialRequired=false;
 let emailMode = 'success', updateMode = 'success', validRecovery = true;
 let browser, socket, seq = 0;
 const pending = new Map(), exceptions = [], requests = [];
@@ -29,7 +30,7 @@ async function evaluate(expression) {
   return r.result.value;
 }
 async function until(expression, message) {
-  for (const deadline=Date.now()+20000;Date.now()<deadline;) { if (await evaluate(expression)) return; await delay(100); }
+  for (const deadline=Date.now()+20000;Date.now()<deadline;) { if (await evaluate('!!document.body && (' + expression + ')')) return; await delay(100); }
   throw new Error(message + '\n' + (await evaluate('document.body.innerText')).slice(0,1400));
 }
 function control(name) {
@@ -73,8 +74,17 @@ async function fulfill(event) {
     if(validRecovery) data=user; else {status=401;data={code:'bad_jwt',msg:'Fixture invalid token'};}
   } else if(url.pathname==='/auth/v1/user' && req.method==='PUT') {
     if(updateMode==='weak') {status=422;data={code:'weak_password',msg:'Fixture weak password'};} else data=user;
+  } else if(url.pathname==='/auth/v1/signup') {
+    data={user,session:null};
   } else if(url.pathname==='/auth/v1/token' && url.searchParams.get('grant_type')==='password') {
     data={access_token:jwt,refresh_token:'fixture-refresh-token',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,token_type:'bearer',user};
+  } else if(url.pathname==='/rest/v1/rpc/finlit_api') {
+    const action=JSON.parse(req.postData||'{}').p_action;
+    if(action==='snapshot')data={lessons:{},modules:[],diagnostic:null};
+    else if(action==='journey')data={required:initialRequired,legacy:!initialRequired,baseline:null,final:null,finalAvailable:false,priorities:[],comparison:{available:false,comparable:false}};
+    else if(action==='assessment'){const form=require('./knowledge-content.cjs').forms[0];data={assessment:{id:'fixture',title:form.title,assessment_type:'diagnostic',content_key:form.key},attempt:null,answers:{},history:[],questions:form.questions.map((q,i)=>({id:'question-'+i,prompt:q.prompt,topic:q.topic,options:q.options.map((text,j)=>({id:'option-'+i+'-'+j,text}))}))};}
+    else if(action==='budget')data={plans:[],entries:[],categories:[{id:'10000000-0000-4000-a000-000000000099',name:'Food',entry_type:'expense'}],insights:false};
+    else {status=400;data={code:'fixture_denied',message:'Unexpected learning action in auth test'};}
   } else if(url.pathname.startsWith('/rest/v1/')) data=[];
   else if(url.pathname!=='/auth/v1/logout') {status=400;data={code:'fixture_denied',msg:'Unmocked API call blocked'};}
   await send('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:status,responseHeaders:[
@@ -105,7 +115,7 @@ async function fulfill(event) {
   }
   const health=await fetch(base,{signal:AbortSignal.timeout(20000)}); assert(health.ok,'Start Expo web before running this test');
   browser=spawn(process.env.FINLIT_BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',[
-    '--headless=new','--disable-gpu','--no-first-run','--disable-background-networking','--disable-extensions','--disable-features=msImplicitSignin',
+    '--no-sandbox','--headless=new','--disable-gpu','--no-first-run','--disable-background-networking','--disable-extensions','--disable-features=msImplicitSignin',
     '--remote-debugging-port=9329','--user-data-dir='+path.join(root,'profile-'+Date.now()),'about:blank',
   ],{windowsHide:true,stdio:'ignore'});
   let pages;
@@ -195,29 +205,45 @@ async function fulfill(event) {
   // Exercise the shared navigation and the retired deep links with the real exported app.
   const navigation = ['Home','Learn','Budget','Profile'];
   async function checkNavigation() {
+    await until('!!('+control('Home')+')','Navigation did not render');
     const labels = await evaluate('Array.from(document.querySelectorAll("[role=button][aria-label]")).filter(e=>e.getClientRects().length>0).map(e=>e.getAttribute("aria-label"))');
     assert.deepEqual(labels.filter(label=>navigation.includes(label)),navigation);
     assert(!labels.includes('Loan'),'Retired Loan tab is still visible');
     assert(!await evaluate('Array.from(document.querySelectorAll("a")).some(e=>e.getClientRects().length>0&&/loan-calculator|loan\\/result/.test(e.getAttribute("href")||""))'),'Calculator shortcut remains');
   }
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await until('document.body.innerText.includes("0% complete")','Home progress did not load');
+  assert(await evaluate('document.body.innerText.includes("master today?")'),'Home mockup heading missing');
+  assert(!await evaluate('document.body.innerText.includes("Build your financial confidence")'),'Home still duplicates Learn');
+  await shot('home-dashboard-390');
+  await send('Emulation.setDeviceMetricsOverride',{width:320,height:640,deviceScaleFactor:1,mobile:true});
+  assert(await evaluate('document.documentElement.scrollWidth <= innerWidth'),'Home overflows at 320px');
+  await shot('home-dashboard-320');
+  await button('View all modules');
+  await until('location.pathname==="/learn" && document.body.innerText.includes("Build your financial confidence")','View all did not open Learn');
+  await button('Home');
+  await until('document.body.innerText.includes("0% complete")','Home did not reload');
+  await evaluate('Array.from(document.querySelectorAll("[role=button]")).find(e=>e.getAttribute("aria-label")?.startsWith("Start lesson:")).click()');
+  await until('location.pathname.startsWith("/learn/lesson/")','Featured lesson link failed');
+  await send('Page.navigate',{url:base+'/dashboard'});
+  await until('document.body.innerText.includes("0% complete")','Home did not reload after lesson');
+  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   await checkNavigation();await shot('07-four-item-navigation');
   await button('Budget');await until('location.pathname==="/budget"','Budget navigation failed');
-  await until('document.body.innerText.includes("K780")','Budget balance changed');
-  await button('Try an extra K120 expense');
-  await until('document.body.innerText.includes("K660")&&document.body.innerText.includes("K1,740")','Budget expense calculation regressed');
-  await button('View example breakdown');
-  await until('document.body.innerText.includes("Budget breakdown")&&document.body.innerText.includes("K1,620")','Budget summary failed');
-  await button('Explore an example entry');await input('Amount (K)','725');await button('Expense');
-  assert.equal(await evaluate(field('Amount (K)')+'.value'),'725','Budget entry form regressed');
+  await until('document.body.innerText.includes("No budget yet")','Genuine budget empty state missing');
+  assert(!await evaluate('document.body.innerText.includes("K780")'),'Fictional personal budget returned');
+  await button('Create a budget');await until('location.pathname==="/budget/create"','Budget creation navigation failed');
+  await input('Planned income (K)','725');
+  assert.equal(await evaluate(field('Planned income (K)')+'.value'),'725','Budget form input regressed');
   await send('Page.navigate',{url:base+'/dashboard'});
   await until('!!('+control('Learn')+')','Dashboard navigation missing');
   await button('Learn');await until('location.pathname==="/learn"','Learning navigation failed');
   await until('document.body.innerText.includes("Borrowing and Debt")','Borrowing module missing');
-  await evaluate('Array.from(document.querySelectorAll("[role=button]")).find(e=>e.getClientRects().length>0&&e.textContent.startsWith("4. Borrowing and Debt")).click()');
-  await until('location.pathname==="/learn/module/planned-module-4"','Borrowing module link failed');
+  await evaluate('Array.from(document.querySelectorAll("[role=button]")).find(e=>e.getClientRects().length>0&&e.getAttribute("aria-label")==="Borrowing and Debt Management. Locked").click()');
+  await until('location.pathname==="/learn/module/module-4"','Borrowing module link failed');
+  await until('document.body.innerText.includes("Understanding borrowing")','Borrowing lessons did not finish loading');
   const borrowing = await evaluate('document.body.innerText');
-  for(const title of ['Understanding borrowing','Interest, fees and total repayment','Loan affordability','Managing debt responsibly'])assert(borrowing.includes(title),'Missing borrowing lesson: '+title);
+  for(const title of ['Understanding borrowing','Interest, Fees and Repayment','Borrowing Affordability','Managing debt responsibly'])assert(borrowing.includes(title),'Missing borrowing lesson: '+title);
   for(const route of ['/loan-calculator','/loan/result']) {
     await send('Page.navigate',{url:base+route});
     await until('location.pathname==="/learn"','Retired route did not redirect: '+route);
@@ -229,8 +255,16 @@ async function fulfill(event) {
   await button('Profile');await until('location.pathname==="/profile"','Profile navigation failed');
   await send('Emulation.setDeviceMetricsOverride',{width:320,height:640,deviceScaleFactor:1,mobile:true});
   await checkNavigation();await shot('08-four-item-navigation-narrow');
+  // A confirmed first-time account must reach the assessment, while Budget stays independent.
+  await button('Log out');await until('!!('+control('Get started')+')','Logout failed');await button('Get started');
+  await button('New here? Create account');await input('Full name','Finlit Learner');await input('Email address',fakeEmail);await input('Password',fakePassword);await button('Create account');
+  await until('document.body.innerText.includes("Check your email")','Registration confirmation missing');
+  initialRequired=true;await input('Password',fakePassword);await button('Log in');
+  await until('location.pathname==="/diagnostic" && document.body.innerText.includes("18 questions")','First-time login did not reach diagnostic');await shot('09-first-time-assessment');
+  await button('Open Budget Tracker');await until('location.pathname==="/budget" && document.body.innerText.includes("No budget yet")','First-time budget blocked');
+  await send('Page.navigate',{url:base+'/learn/lesson/lesson-1-1'});await until('location.pathname==="/diagnostic"','Direct lesson URL bypassed initial assessment');
   assert.equal(exceptions.length,0,'Browser runtime exception: '+JSON.stringify(exceptions));
-  console.log('Auth UI checks passed: login/signup visibility, forgot email validation/prefill, rate limits, duplicate request guard, neutral success, recovery URL cleanup, reset validation/visibility/errors/success, direct-route protection, expired-link retry, normal sign-in, 390/320px layouts and learner copy. Four-item navigation, dashboard/learning/budget/profile, budget math/summary/entry, Module 4 titles and retired deep-link redirects also passed. All Supabase requests mocked; no live emails or updates.');
+  console.log('Auth UI checks passed: login/signup visibility, forgot email validation/prefill, rate limits, duplicate request guard, neutral success, recovery URL cleanup, reset validation/visibility/errors/success, direct-route protection, expired-link retry, normal sign-in, 390/320px layouts and learner copy. Four-item navigation, dashboard/learning/budget/profile, genuine budget empty state and creation form, Module 4 titles and retired deep-link redirects also passed. All Supabase requests mocked; no live emails or updates.');
 })().catch(error=>{console.error(error);console.error('Runtime exceptions:',exceptions);process.exitCode=1;}).finally(async()=>{
   try{if(socket?.readyState===1)await send('Browser.close');}catch{}
   socket?.close();browser?.kill();if(server?.listening)server.close();

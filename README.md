@@ -1,50 +1,22 @@
-# Welcome to your Expo app 👋
+# Finlit
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Financial learning and personal budgeting for Zambian university students, built with Expo SDK 54, React Native and Supabase.
 
-## Get started
+The app includes six modules, 24 lessons, an 18-question initial assessment, personalised priorities, a distinct 18-question final assessment, preserved baseline comparison and an independent Budget Tracker. **All eight live migrations have local copies; the assessment migration was applied on 3 November 2026.** See the [assessment implementation report](docs/knowledge-assessment-system.md) for the complete workflow, verification and device/research limitations. The [earlier implementation report](docs/implementation-status.md) documents the curriculum and Budget Tracker.
 
-1. Install dependencies
+## Run locally
 
-   ```bash
-   npm install
-   ```
+Use Node 22+ and install the locked dependencies with `npm ci`. Configure the existing public Supabase URL and publishable-key environment variables, then run `npm start`. Never put a service-role key in the app.
 
-2. Start the app
+Account-linked learning and budgeting require the restored project and reviewed migrations. The app shows connection errors when that backend is unavailable; it does not substitute fictional learner records.
 
-   ```bash
-   npx expo start
-   ```
+## Verification
 
-In the output, you'll find options to open the app in a
+See [the report](docs/implementation-status.md#repeat-checks) for TypeScript, ESLint, unit, disposable-Postgres and browser checks. Browser fixtures do not change real accounts or send emails.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Documentation
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- [Current implementation and acceptance report](docs/implementation-status.md)
+- [Authentication implementation](docs/prototype-auth.md)
+- [Earlier lesson implementation history](docs/learning-experience.md)
+- [Loan calculator removal](docs/loan-calculator-removal.md)

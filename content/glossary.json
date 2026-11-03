@@ -1,0 +1,214 @@
+[
+  {
+    "term": "Allocation",
+    "meaning": "An amount set aside for a category."
+  },
+  {
+    "term": "Available funds",
+    "meaning": "Confirmed money accessible when a payment is due."
+  },
+  {
+    "term": "Cash-flow timing",
+    "meaning": "When money arrives relative to when costs are due."
+  },
+  {
+    "term": "Committed funds",
+    "meaning": "Money already reserved for an obligation."
+  },
+  {
+    "term": "Complaint reference",
+    "meaning": "An identifier used to follow an enquiry or complaint."
+  },
+  {
+    "term": "Contingency",
+    "meaning": "An amount or alternative plan for uncertain costs."
+  },
+  {
+    "term": "Contribution",
+    "meaning": "An amount added towards the target during a period."
+  },
+  {
+    "term": "Debt cycling",
+    "meaning": "Repeatedly using new borrowing to service old debt without resolving repayment capacity."
+  },
+  {
+    "term": "Disclosure",
+    "meaning": "Information provided about terms, charges and conditions."
+  },
+  {
+    "term": "Diversification",
+    "meaning": "Spreading exposure rather than depending entirely on one investment."
+  },
+  {
+    "term": "Due diligence",
+    "meaning": "Checking evidence and conditions before committing money."
+  },
+  {
+    "term": "Earned income",
+    "meaning": "Money obtained through work or business activity."
+  },
+  {
+    "term": "Financial boundary",
+    "meaning": "A clear limit on what money or responsibility you can offer."
+  },
+  {
+    "term": "Financial shock",
+    "meaning": "An unexpected event that changes costs or income."
+  },
+  {
+    "term": "Fixed expense",
+    "meaning": "A cost that is broadly stable for the planned period."
+  },
+  {
+    "term": "Inflation",
+    "meaning": "An increase in the general level of prices over time."
+  },
+  {
+    "term": "Informal saving arrangement",
+    "meaning": "A savings arrangement organised outside a formal deposit account."
+  },
+  {
+    "term": "Interest",
+    "meaning": "A borrowing charge related to the loan terms."
+  },
+  {
+    "term": "Investment claim",
+    "meaning": "A statement about expected returns or benefits that needs verification."
+  },
+  {
+    "term": "Liquidity",
+    "meaning": "How readily funds can be accessed when needed."
+  },
+  {
+    "term": "Money available",
+    "meaning": "Money you can use within the period you are planning for."
+  },
+  {
+    "term": "Occasional expense",
+    "meaning": "A cost that does not occur every regular budget period."
+  },
+  {
+    "term": "Opportunity cost",
+    "meaning": "The best alternative forgone when making a choice."
+  },
+  {
+    "term": "OTP",
+    "meaning": "A one-time password used to authorise or verify an action."
+  },
+  {
+    "term": "Outstanding balance",
+    "meaning": "The amount still owed."
+  },
+  {
+    "term": "Payment reference",
+    "meaning": "An identifier used to match a payment to its purpose."
+  },
+  {
+    "term": "Phishing",
+    "meaning": "Deceptive communication designed to obtain sensitive information or access."
+  },
+  {
+    "term": "Planned expenses",
+    "meaning": "Costs you expect to pay during that period."
+  },
+  {
+    "term": "Planning horizon",
+    "meaning": "The future period considered in a plan."
+  },
+  {
+    "term": "Principal",
+    "meaning": "The original amount borrowed."
+  },
+  {
+    "term": "Priority",
+    "meaning": "A cost placed ahead of another because of its consequence or urgency."
+  },
+  {
+    "term": "Purchasing power",
+    "meaning": "The goods and services an amount of money can buy."
+  },
+  {
+    "term": "Rebuilding plan",
+    "meaning": "A realistic schedule for restoring used reserves."
+  },
+  {
+    "term": "Receipt",
+    "meaning": "Evidence containing transaction details."
+  },
+  {
+    "term": "Received support",
+    "meaning": "Money provided without working for it, such as a family gift."
+  },
+  {
+    "term": "Recipient",
+    "meaning": "The person or organisation receiving payment."
+  },
+  {
+    "term": "Reconciled balance",
+    "meaning": "A balance checked against recorded confirmed movements."
+  },
+  {
+    "term": "Reconciliation",
+    "meaning": "Checking records against balances and receipts."
+  },
+  {
+    "term": "Remaining balance",
+    "meaning": "Money available minus the total planned expenses."
+  },
+  {
+    "term": "Repayment capacity",
+    "meaning": "Funds available for repayment after essential commitments."
+  },
+  {
+    "term": "Repayment obligation",
+    "meaning": "The amount and timing you agree to repay."
+  },
+  {
+    "term": "Return",
+    "meaning": "Gain or loss relative to the amount invested."
+  },
+  {
+    "term": "Risk",
+    "meaning": "Uncertainty about outcomes, including loss or unavailable funds."
+  },
+  {
+    "term": "Saving capacity",
+    "meaning": "What can realistically be set aside after considering commitments."
+  },
+  {
+    "term": "Savings",
+    "meaning": "Money retained for future use."
+  },
+  {
+    "term": "Scenario plan",
+    "meaning": "A plan that considers more than one possible outcome."
+  },
+  {
+    "term": "Target",
+    "meaning": "The amount needed for a specific purpose."
+  },
+  {
+    "term": "Timing mismatch",
+    "meaning": "A payment is due before funds become available."
+  },
+  {
+    "term": "Total borrowing cost",
+    "meaning": "All required payments minus the amount actually received."
+  },
+  {
+    "term": "Transaction fee",
+    "meaning": "A charge for a service, recorded as an expense."
+  },
+  {
+    "term": "Transfer",
+    "meaning": "Movement between your own accounts or cash holdings."
+  },
+  {
+    "term": "Variable expense",
+    "meaning": "A cost that changes with consumption or circumstances."
+  },
+  {
+    "term": "Variance",
+    "meaning": "The difference between an allocation and actual or revised spending."
+  }
+]

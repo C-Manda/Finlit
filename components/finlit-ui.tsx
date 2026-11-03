@@ -1,7 +1,8 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { useState, type ComponentProps, type ReactNode } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { commonStyles, palette, radii, spacing } from '@/constants/finlit-theme';
 
@@ -9,7 +10,7 @@ type IconName = ComponentProps<typeof Ionicons>['name'];
 type Tone = 'blush' | 'mint' | 'blue' | 'peach' | 'lilac';
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
-  const body = scroll ? <ScrollView contentContainerStyle={commonStyles.content} showsVerticalScrollIndicator={false}>{children}</ScrollView> : children;
+  const body = scroll ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={commonStyles.content} showsVerticalScrollIndicator={false}>{children}</ScrollView> : children;
   return <SafeAreaView style={commonStyles.page}>{body}</SafeAreaView>;
 }
 

@@ -12,15 +12,16 @@ function load(path, imports = {}) {
   }, console, Promise }, { filename: path });
   return module.exports;
 }
-const c = load('content/learning.ts');
+const c = { ...require('./load-typescript.cjs')('content/learning.ts'), ...require('./load-typescript.cjs')('content/authored.ts') };
+const parse = c.parseProgress; c.parseProgress = raw => parse(raw,c.authoredLessons);
 const lesson = c.sampleLesson;
 assert.equal(c.curriculum.length, 6);
 assert.equal(new Set(c.curriculum.flatMap(m => m.lessons.map(l => l.id))).size, 24);
 assert(c.curriculum.every(m => m.lessons.length === 4));
-assert.equal(c.authoredLessons.length, 1, 'Only one lesson has sample content');
+assert.equal(c.authoredLessons.length, 24, 'Every lesson has teaching content');
 assert.equal(lesson.checkpoint.length, 3);
-assert.equal(lesson.sourceStatus, 'sample');
-assert.equal(lesson.citations.length, 0);
+assert.equal(lesson.sourceStatus, 'reviewed');
+assert(lesson.references.length >= 2);
 assert(lesson.estimatedMinutes >= 9 && lesson.estimatedMinutes <= 12);
 assert.equal(c.LEARNING_RULES.challengeQuestions, 8);
 assert.equal(c.LEARNING_RULES.challengePassScore, 6);
@@ -81,7 +82,7 @@ const service = load('services/sample-progress.ts', {
     getItemAsync: async key => storage.get(key) ?? null,
     setItemAsync: async (key, value) => { if (fail) throw new Error('disk full'); storage.set(key, value); },
   },
-  '@/content/learning': c,
+  '@/content/learning': c, '@/content/authored': c,
 });
 (async () => {
   let saved = c.newLessonRecord(2);
@@ -106,5 +107,5 @@ const service = load('services/sample-progress.ts', {
   assert.equal(restored.stage, 0);
   assert.equal(restored.answers[0], 0);
   for (const value of storage.values()) assert(Buffer.byteLength(value) < 2048);
-  console.log('Learning checks passed: one authored sample, 24-title plan, seven-stage gates, checked feedback, back/review, math, validation, restore, account isolation, failed saves, stale-write rejection, completion preservation.');
+  console.log('Learning checks passed: 24 authored lessons, seven-stage gates, checked feedback, back/review, math, validation, restore, account isolation, failed saves, stale-write rejection, completion preservation.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

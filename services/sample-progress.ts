@@ -1,6 +1,7 @@
+import { authoredLessons } from '@/content/authored';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { authoredLessons, emptyProgress, newLessonRecord, parseProgress, validateRecord, type LearningProgress, type LessonRecord } from '@/content/learning';
+import { emptyProgress, newLessonRecord, parseProgress, validateRecord, type LearningProgress, type LessonRecord } from '@/content/learning';
 
 // v1 arithmetic previews stay untouched; their answers do not match this authored sample.
 const key = (userId: string, id: string) => 'finlit.sample.v2.' + userId + '.' + id;
@@ -21,7 +22,7 @@ async function readProgress(userId: string): Promise<LearningProgress> {
     const raw = await read(key(userId, lesson.id));
     if (raw) progress.lessons[lesson.id] = JSON.parse(raw);
   }));
-  return parseProgress(JSON.stringify(progress));
+  return parseProgress(JSON.stringify(progress), authoredLessons);
 }
 let pending: Promise<unknown> = Promise.resolve();
 export async function loadSampleProgress(userId: string) {

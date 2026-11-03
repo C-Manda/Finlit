@@ -1,7 +1,8 @@
+import { authoredLessons } from '@/content/authored';
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/auth-context';
-import { authoredLessons, emptyProgress, newLessonRecord, type LessonRecord } from '@/content/learning';
+import { emptyProgress, newLessonRecord, type LessonRecord } from '@/content/learning';
 import { loadSampleProgress, saveSampleProgress } from '@/services/sample-progress';
 
 export function useSampleProgress() {

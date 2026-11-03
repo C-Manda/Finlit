@@ -1,3 +1,9 @@
+# Current learning system
+
+The single-lesson increment below is historical. The current implementation authors all 24 lessons and six challenges, uses account-linked RPC persistence, and integrates the Budget Tracker. See [implementation-status.md](implementation-status.md) for the current architecture, source review, tests and exact live-database blocker. Preview exceptions and the historical local-only production flow no longer apply.
+
+---
+
 # Latest update
 
 The 21 October learner-interface and password-recovery changes are documented in [prototype-auth.md](prototype-auth.md). The earlier report below describes the first lesson implementation. Current buttons use Start lesson/Continue lesson/Review lesson and developer commentary has been removed from screens.
