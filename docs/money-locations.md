@@ -25,9 +25,9 @@ Money locations extend the existing Budget and Add Entry components; the two sum
 
 Cash is backfilled once for existing users and created by an auth-user trigger for future users. Authenticated clients cannot directly insert/update/delete financial data. Private helpers cannot be invoked by clients. All mutations use `finlit_api` with authenticated ownership validation. No existing financial entries are rewritten.
 
-## Future import boundary
+## SMS import boundary
 
-No SMS implementation is included. `financial_entries.import_metadata` reserves a JSON envelope for a future validated import adapter, and `request_id` retains owner-scoped idempotency. That adapter must supply the explicit `location` UUID and use the existing entry RPC, with a stable deduplication key derived from the provider transaction reference. Store only necessary provider/reference/parser/source metadata, never wallet PINs or banking credentials. Provider detection alone must not select between same-provider wallets: require a confirmed wallet mapping or manual selection. The current API intentionally does not accept arbitrary import metadata from clients; a future adapter must add validation before populating it.
+The reviewed SMS adapter is documented in [Mobile Money SMS integration](mobile-money-sms.md). It supplies confirmed transactions to the existing ledger API, with explicit wallets, database deduplication and opening-balance boundaries. It does not replace Money Locations or count opening balances as income. Native APK/device verification remains pending; see that document for actual build and test results.
 
 ## Validation and limits
 

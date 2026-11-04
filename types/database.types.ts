@@ -469,6 +469,7 @@ export type Database = {
           id: string
           import_metadata: Json | null
           location_id: string | null
+          occurred_at: string | null
           occurred_on: string
           request_id: string | null
           revision: number
@@ -488,6 +489,7 @@ export type Database = {
           id?: string
           import_metadata?: Json | null
           location_id?: string | null
+          occurred_at?: string | null
           occurred_on?: string
           request_id?: string | null
           revision?: number
@@ -507,6 +509,7 @@ export type Database = {
           id?: string
           import_metadata?: Json | null
           location_id?: string | null
+          occurred_at?: string | null
           occurred_on?: string
           request_id?: string | null
           revision?: number
@@ -1046,6 +1049,87 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "financial_categories"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_imports: {
+        Row: {
+          amount: number | null
+          balance_after: number | null
+          created_at: string
+          fee_amount: number | null
+          financial_entry_id: string | null
+          id: string
+          location_id: string
+          message_fingerprint: string
+          parser_version: string
+          provider: string
+          provider_transaction_id: string | null
+          sms_received_at: string
+          status: string
+          timestamp_source: string
+          tracking_started_at: string
+          transaction_occurred_at: string
+          transaction_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number | null
+          balance_after?: number | null
+          created_at?: string
+          fee_amount?: number | null
+          financial_entry_id?: string | null
+          id?: string
+          location_id: string
+          message_fingerprint: string
+          parser_version: string
+          provider: string
+          provider_transaction_id?: string | null
+          sms_received_at: string
+          status?: string
+          timestamp_source: string
+          tracking_started_at: string
+          transaction_occurred_at: string
+          transaction_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number | null
+          balance_after?: number | null
+          created_at?: string
+          fee_amount?: number | null
+          financial_entry_id?: string | null
+          id?: string
+          location_id?: string
+          message_fingerprint?: string
+          parser_version?: string
+          provider?: string
+          provider_transaction_id?: string | null
+          sms_received_at?: string
+          status?: string
+          timestamp_source?: string
+          tracking_started_at?: string
+          transaction_occurred_at?: string
+          transaction_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_imports_financial_entry_id_fkey"
+            columns: ["financial_entry_id"]
+            isOneToOne: false
+            referencedRelation: "financial_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_imports_user_id_location_id_fkey"
+            columns: ["user_id", "location_id"]
+            isOneToOne: false
+            referencedRelation: "money_locations"
+            referencedColumns: ["user_id", "id"]
           },
         ]
       }

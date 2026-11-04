@@ -1,0 +1,83 @@
+package expo.modules.finlitsms
+
+import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.ContentResolver
+import android.os.Bundle
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Telephony
+import expo.modules.interfaces.permissions.Permissions
+import expo.modules.kotlin.Promise
+import expo.modules.kotlin.modules.Module
+import expo.modules.kotlin.modules.ModuleDefinition
+
+class FinlitSmsModule : Module() {
+  private val context get()=requireNotNull(appContext.reactContext)
+  private val prefs get()=context.getSharedPreferences("finlit_sms_settings",Context.MODE_PRIVATE)
+  private fun owner(expected:String):String { require(prefs.getString("owner",null)==expected && expected.isNotBlank()) { "Account changed; reopen SMS tracking" };return expected }
+  private fun granted()=listOf(Manifest.permission.READ_SMS,Manifest.permission.RECEIVE_SMS).all {context.checkSelfPermission(it)==PackageManager.PERMISSION_GRANTED}
+  private val listener=object:BroadcastReceiver(){override fun onReceive(c:Context,i:Intent){sendEvent("onCandidate",emptyMap<String,Any>())}}
+  override fun definition()=ModuleDefinition {
+    Name("FinlitSms")
+    Events("onCandidate")
+    OnCreate {
+      val filter=IntentFilter("expo.modules.finlitsms.CANDIDATE")
+      if(Build.VERSION.SDK_INT>=33)context.registerReceiver(listener,filter,Context.RECEIVER_NOT_EXPORTED) else context.registerReceiver(listener,filter)
+    }
+    OnDestroy { try { context.unregisterReceiver(listener) } catch(_:IllegalArgumentException) {} }
+    AsyncFunction("setOwner") { value:String? -> prefs.edit().apply {if(value==null)remove("owner")else putString("owner",value)}.commit();Unit }
+    AsyncFunction("permissionStatus") { promise:Promise -> Permissions.getPermissionsWithPermissionsManager(appContext.permissions,promise,Manifest.permission.READ_SMS,Manifest.permission.RECEIVE_SMS) }
+    AsyncFunction("requestPermissions") { promise:Promise -> Permissions.askForPermissionsWithPermissionsManager(appContext.permissions,promise,Manifest.permission.READ_SMS,Manifest.permission.RECEIVE_SMS) }
+    AsyncFunction("settings") { expected:String ->
+      val u=owner(expected)
+      mapOf("enabled" to prefs.getBoolean("enabled_$u",false),"baseline" to prefs.getString("baseline_$u",null),"lastScan" to prefs.getString("lastScan_$u",null),"full" to prefs.getBoolean("full_$u",false),"cache" to prefs.getString("cache_$u",null))
+    }
+    AsyncFunction("setEnabled") { expected:String, enabled:Boolean ->
+      val u=owner(expected);require(!enabled||granted()) {"SMS permissions are required"}
+      prefs.edit().putBoolean("enabled_$u",enabled).apply { if(enabled&&!prefs.contains("baseline_$u"))putString("baseline_$u",smsIsoTime()) }.commit();Unit
+    }
+    AsyncFunction("saveCache") { expected:String,value:String -> require(value.length<=2000000);prefs.edit().putString("cache_${owner(expected)}",value).commit();Unit }
+    AsyncFunction("candidates") { expected:String -> SmsQueue(context).use {it.list(owner(expected))} }
+    AsyncFunction("saveCandidate") { expected:String,id:String,value:String -> SmsQueue(context).use {it.save(owner(expected),id,value)} }
+    AsyncFunction("acknowledge") { expected:String,id:String -> SmsQueue(context).use {it.acknowledge(owner(expected),id)} }
+    AsyncFunction("clearCandidates") { expected:String -> val u=owner(expected);SmsQueue(context).use {it.acknowledge(u,null)};prefs.edit().putBoolean("full_$u",false).commit();Unit }
+    AsyncFunction("scan") { expected:String,since:Double,before:Double,beforeId:String? ->
+      val u=owner(expected);require(granted()) {"SMS permission was denied or revoked. Open Android settings to grant it."};require(prefs.getBoolean("enabled_$u",false)) {"SMS tracking is disabled"}
+      require(since.isFinite()&&before.isFinite()&&since>=0&&before>since)
+      var visited=0;var added=0;var lastDate=before.toLong();var lastId=beforeId?:Long.MAX_VALUE.toString();var full=false
+      val projection=arrayOf("_id","address","body","date","date_sent","sub_id")
+      val selection="date>=? AND (date<? OR (date=? AND _id<?))"
+      val args=arrayOf(since.toLong().toString(),before.toLong().toString(),before.toLong().toString(),beforeId?:Long.MAX_VALUE.toString())
+      // Bounded query plus keyset cursor: at most 250 SMS rows per user action, no OFFSET scan.
+      val cursor=if(Build.VERSION.SDK_INT>=26) {
+        val queryArgs=Bundle().apply {
+          putString(ContentResolver.QUERY_ARG_SQL_SELECTION,selection)
+          putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,args)
+          putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER,"date DESC, _id DESC")
+          putInt(ContentResolver.QUERY_ARG_LIMIT,250)
+        }
+        context.contentResolver.query(Telephony.Sms.Inbox.CONTENT_URI,projection,queryArgs,null)
+      } else context.contentResolver.query(Telephony.Sms.Inbox.CONTENT_URI,projection,selection,args,"date DESC, _id DESC")
+      // Some providers ignore QUERY_ARG_LIMIT; the cursor loop independently caps reads.
+      requireNotNull(cursor) {"Android could not read the SMS inbox. Retry after checking permissions."}.use { c ->
+        SmsQueue(context).use { q ->
+          while(visited<250&&c.moveToNext()) {
+            if(prefs.getString("owner",null)!=u||!prefs.getBoolean("enabled_$u",false)||!granted())break
+            visited++;lastId=c.getString(0);lastDate=c.getLong(3)
+            val sender=c.getString(1)?:"";val body=c.getString(2)?:""
+            if(SmsQueue.candidate(sender,body)) {
+              val sub=if(c.isNull(5)||c.getInt(5)<0)null else c.getString(5)
+              if(q.enqueue(u,sender,body,lastDate,c.getLong(4).takeIf {it>0}?:lastDate,sub))added++ else full=true
+            }
+          }
+        }
+      }
+      prefs.edit().putString("lastScan_$u",smsIsoTime()).putBoolean("full_$u",full).commit()
+      mapOf("visited" to visited,"candidates" to added,"before" to lastDate.toDouble(),"beforeId" to lastId,"more" to (visited==250),"full" to full)
+    }
+  }
+}

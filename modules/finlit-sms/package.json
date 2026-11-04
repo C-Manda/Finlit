@@ -1,0 +1,6 @@
+{
+  "name": "finlit-sms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FinLit Android-only local SMS capture module"
+}

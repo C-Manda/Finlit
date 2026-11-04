@@ -1,3 +1,4 @@
+import { SmsLifecycle } from '@/components/sms-lifecycle';
 import { usePalette } from '@/constants/finlit-theme';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +11,7 @@ export default function RootLayout() {
   const palette = usePalette();
   return (
     <AuthProvider>
+      <SmsLifecycle />
       <AuthGate>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.canvas } }} />
       </AuthGate>

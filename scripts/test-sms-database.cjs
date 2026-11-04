@@ -1,0 +1,38 @@
+const assert=require('node:assert/strict'),{randomUUID,createHash}=require('node:crypto');
+const {PGlite}=require(process.env.FINLIT_PGLITE_PATH||'@electric-sql/pglite');
+const {setup}=require('./test-database.cjs');
+(async()=>{const db=new PGlite();try{
+ await setup(db);const user=randomUUID(),other=randomUUID();await db.query('insert into auth.users(id) values($1),($2)',[user,other]);
+ const as=async id=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);await db.exec('set role authenticated');};
+ const api=async(action,p={})=>(await db.query('select public.finlit_api($1,$2::jsonb) data',[action,JSON.stringify(p)])).rows[0].data;
+ await as(user);let budget=await api('budget');const cash=budget.locations[0],income=budget.categories.find(c=>c.entry_type==='income'),expense=budget.categories.find(c=>c.entry_type==='expense');
+ const wallet=await api('create_location',{type:'mobile_money',provider:'MTN MoMo',colour:'#f6d365',opening:500,date:'2026-01-01',request:randomUUID()});
+ const fingerprint=()=>createHash('sha256').update(randomUUID()).digest('hex');
+ const candidate={baseline:'2026-01-01T00:00:00+02:00',wallet:wallet.id,walletConfirmed:true,provider:'mtn',kind:'received',amountMinor:5000,feeMinor:null,balanceMinor:55000,reference:'TEST-1',fingerprint:fingerprint(),occurredAt:'2026-02-01T10:00:00Z',receivedAt:'2026-02-01T10:00:10Z',timestampSource:'provider',parserVersion:'finlit-sms-1'};
+ const stage=p=>api('sms_stage',{...candidate,...p});
+ const decision={confirmed:true,feeConfirmed:true,feeMinor:0,type:'income',source:wallet.id,category:income.id,decision:'import'};
+ const resolve=(s,p={})=>api('sms_resolve',{id:s.id,...decision,...p});
+ const bal=async id=>(await api('budget')).locations.find(l=>l.id===id).balance;
+ const first=await stage({});assert.equal((await stage({})).id,first.id);assert.equal((await stage({fingerprint:fingerprint()})).id,first.id);
+ await assert.rejects(()=>resolve(first,{feeConfirmed:false}),/Confirm the actual fee/);
+ await resolve(first);await resolve(first);assert.equal(await bal(wallet.id),550);assert.equal((await api('budget')).entries.length,1);
+ const sameAmount=await stage({reference:'TEST-2',fingerprint:fingerprint()});await resolve(sameAmount);assert.equal(await bal(wallet.id),600);
+ let history=await stage({reference:'OLD',fingerprint:fingerprint(),occurredAt:'2025-12-31T10:00:00Z'});assert.equal(history.status,'history_only');await resolve(history);assert.equal(await bal(wallet.id),600);
+ const openingDay=await stage({reference:'OPEN',fingerprint:fingerprint(),occurredAt:'2026-01-01T10:00:00Z'});await assert.rejects(()=>resolve(openingDay),/opening-day/);await resolve(openingDay,{decision:'history'});
+ for(const kind of ['balance_check','failed','loan','refund','reversal']){const s=await stage({reference:kind,fingerprint:fingerprint(),kind});await assert.rejects(()=>resolve(s),/cannot post/);await resolve(s,{decision:'ignore'});}
+ const withdrawal=await stage({reference:'CASH',fingerprint:fingerprint(),kind:'withdrawal',amountMinor:10000,feeMinor:250,occurredAt:new Date().toISOString(),receivedAt:new Date().toISOString()});
+ await assert.rejects(()=>resolve(withdrawal,{type:'expense',category:expense.id,feeMinor:250}),/Withdrawals/);
+ await resolve(withdrawal,{type:'transfer',destination:cash.id,category:null,feeMinor:250});assert.equal(await bal(wallet.id),497.5);assert.equal(await bal(cash.id),100);
+ const poor=await stage({reference:'TOO-MUCH',fingerprint:fingerprint(),kind:'sent',amountMinor:99999900});const before=(await api('budget')).entries.length;
+ await assert.rejects(()=>resolve(poor,{type:'expense',category:expense.id}),/Insufficient/);assert.equal((await api('budget')).entries.length,before);assert.equal((await api('sms_list')).find(x=>x.id===poor.id).status,'requires_review');
+ const manual=await api('entry',{type:'expense',amount:20,fee:1,category:expense.id,location:wallet.id,date:'2026-02-02',request:randomUUID()});
+ const matching=await stage({reference:'MANUAL',fingerprint:fingerprint(),kind:'sent',amountMinor:2000,feeMinor:100,occurredAt:'2026-02-02T10:00:00Z'});
+ await assert.rejects(()=>resolve(matching,{type:'expense',feeMinor:100,category:expense.id}),/similar entry/);
+ await resolve(matching,{decision:'match',entry:manual.id,type:'expense',feeMinor:100});assert.equal((await api('budget')).entries.length,before+1);
+ assert.equal((await api('budget')).entries.find(x=>x.id===manual.id).occurred_at,'2026-02-02T10:00:00+00:00');
+ await as(other);assert.deepEqual(await api('sms_list'),[]);assert.equal((await db.query('select * from sms_imports')).rows.length,0);
+ await assert.rejects(()=>resolve(first),/unavailable/);await assert.rejects(()=>stage({reference:'FOREIGN'}),/active Mobile Money/);
+ await assert.rejects(()=>db.exec("delete from public.sms_imports"),/permission denied/);
+ await as(user);await api('sms_forget',{id:first.id});assert.equal((await stage({})).id,first.id);assert.equal((await api('budget')).entries.length,before+1);
+ console.log('SMS database PASS: existing ledger integration, precise timestamps, fee confirmation, withdrawals/Cash, references/fingerprints/retries, same amount distinct references, opening/history protection, manual-match/no duplicate, failed/balance-only/loan restrictions, atomic rollback, retention tombstones and RLS.');
+}finally{await db.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

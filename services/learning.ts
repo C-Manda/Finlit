@@ -14,7 +14,7 @@ export async function learningApi<T>(action: string, payload: object = {}): Prom
   const { data, error } = await supabase.rpc('finlit_api', { p_action: action, p_payload: payload as Json });
   if (error) {
     if (error.code === '40001' || error.code === 'P0001') throw new Error(error.message);
-    if (error.code === '42501' && ['budget','save_budget','entry','update_entry','delete_entry','consent','create_location','adjust_location','delete_location'].includes(action)) throw new Error('This financial record is unavailable or your session has expired. Reload your budget or sign in again.');
+    if (error.code === '42501' && ['budget','save_budget','entry','update_entry','delete_entry','consent','create_location','adjust_location','delete_location','sms_stage','sms_resolve','sms_list','sms_forget'].includes(action)) throw new Error('This financial record is unavailable or your session has expired. Reload your budget or sign in again.');
     if (error.code === '42501') throw new Error('This content is locked or your session has expired. Return to your learning path or sign in again.');
     throw new Error('We could not connect to your account data. Check your connection and try again.');
   }

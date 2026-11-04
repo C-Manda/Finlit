@@ -444,6 +444,7 @@ function BudgetBody({ mode }: { mode: "overview" | "create" | "transaction" }) {
             })
           }
         />
+        <LearningButton title="Mobile Money SMS tracking" secondary onPress={() => route("/budget/sms")}/>
         <Text style={s.heading}>Your money in view</Text>
         <ScrollView
           horizontal

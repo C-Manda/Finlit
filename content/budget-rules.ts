@@ -1,5 +1,5 @@
 export type BudgetPlan = { id: string; period_start: string; period_end: string; planned_income: number; allocations: Record<string, number>; revision: number };
-export type Entry = { location_id?: string | null; destination_location_id?: string | null; id: string; category_id: string | null; entry_type: string; amount: number; description: string | null; occurred_on: string; fee_amount?: number; fee_category_id?: string | null; revision?: number; deleted_at?: string | null };
+export type Entry = { occurred_at?: string | null; location_id?: string | null; destination_location_id?: string | null; id: string; category_id: string | null; entry_type: string; amount: number; description: string | null; occurred_on: string; fee_amount?: number; fee_category_id?: string | null; revision?: number; deleted_at?: string | null };
 export type Category = { id: string; name: string; entry_type: string };
 export type MoneyLocation = { id: string; location_type: 'cash' | 'mobile_money' | 'bank'; provider: string; nickname: string; colour: string; opening_balance: number; opening_date: string; active: boolean; balance: number };
 export type BalanceAdjustment = { id: string; location_id: string; amount: number; balance_before: number; balance_after: number; reason: string; created_at: string };
