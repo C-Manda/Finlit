@@ -126,7 +126,7 @@ async function prepareFixture() {
   await button('Explore the concept');
   await until('window.__reviewRecord.stage===1', 'Concept did not open');
   await button('Explore this term +');
-  await until('document.body.innerText.includes("uncertain payment")', 'Definition did not expand');
+  await until('document.body.innerText.includes("Only funds that can actually be used should support immediate decisions.")', 'Definition did not expand');
   await button('Show worked example');
   await until('window.__reviewRecord.stage===2', 'Example did not open');
   await screenshot('02-worked-example');

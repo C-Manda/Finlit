@@ -1,5 +1,7 @@
 // Reproducible SQL content authoring. No network access and no database mutation.
 const fs = require('node:fs');
+const outputFile = process.argv[2];
+if (!outputFile || !fs.existsSync(outputFile) || fs.statSync(outputFile).size !== 0) throw Error('Provide an empty CLI-created migration; existing migrations are immutable.');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const load=require('./load-typescript.cjs');
@@ -23,15 +25,12 @@ curriculum.forEach((m, mi) => {
       `if lid is null then if (select count(*) from public.lessons where module_id=mid and sort_order=${li+1})>1 then raise exception 'Ambiguous lesson order: map content keys manually'; end if; select id into lid from public.lessons where module_id=mid and sort_order=${li+1}; end if;`,
       `if lid is null then lid:=${quote(id(l.id))}::uuid; insert into public.lessons(id,module_id,title,content,sort_order) values(lid,mid,${quote(l.title)},'',${li+1}); end if;`,
       `if exists(select 1 from public.lesson_progress where lesson_id=lid and player_state is not null) and exists(select 1 from public.lessons where id=lid and structured_content is distinct from ${json(l)}) then raise exception 'Lesson content changed after progress: author a revision migration'; end if;`,
+      `if exists(select 1 from public.lessons where id=lid and (revision>${l.version} or (revision=${l.version} and structured_content is distinct from ${json(l)}))) then raise exception 'Cannot overwrite an existing lesson revision'; end if;`,
       `update public.lessons set content_key=${quote(l.id)},title=${quote(l.title)},summary=${quote(l.introduction)},structured_content=${json(l)},content=${quote(l.concept.introduction)},revision=${l.version},estimated_minutes=${l.estimatedMinutes},is_published=true where id=lid;`);
   });
   assessment('challenge-'+(mi+1),m.title+' · Module challenge','module_quiz',challenges[mi].map((q,qi)=>({prompt:q[0],options:q.slice(1,4),correct:0,explanation:q[4],topic:m.id,rotation:qi%3})),true);
 });
-// Original diagnostic items taken from teaching checkpoints, never module challenge keys.
-assessment('diagnostic','Your financial knowledge starting point','diagnostic',curriculum.flatMap(m=>m.lessons.slice(0,2).map(l=>{
- const q=authoredLessons.find(x=>x.id===l.id).checkpoint[1];
- return {prompt:q.prompt,options:q.options.map(o=>o.text),correct:q.correct,explanation:q.explanation,topic:m.id,rotation:0};
-})),false);
+// Diagnostic/final forms are owned by generate-knowledge.cjs; never republish the retired 12-item form.
 function assessment(key,title,type,questions,module) {
  lines.push(`aid:=null; select id into aid from public.assessments where content_key=${quote(key)};`,
   `if aid is null then aid:=${quote(id(key))}::uuid; insert into public.assessments(id,module_id,title,assessment_type,pass_mark,is_published,content_key) values(aid,${module?'mid':'null'},${quote(title)},${quote(type)},75,true,${quote(key)}); end if;`);
@@ -56,4 +55,4 @@ for(const [type,names] of Object.entries({expense:['Accommodation','Food','Trans
 lines.push('commit;');
 const target=process.argv[2]; if(!target) throw Error('Pass a migration filename created by supabase migration new');
 fs.writeFileSync(target,lines.join('\n')+'\n');
-console.log('Authored 24 lessons, 72 checkpoints, 48 module questions and 12 diagnostic questions. SQL written to '+target);
+console.log('Authored 24 lessons, 72 checkpoints, 48 module questions. SQL written to '+target);

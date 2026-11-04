@@ -10,4 +10,4 @@ export const sources = {
   toolkit: { author: 'OECD', year: 2022, title: 'OECD/INFE Toolkit for Measuring Financial Literacy and Financial Inclusion 2022', url: 'https://doi.org/10.1787/cbc4114f-en', section: 'Knowledge, behaviour, attitudes and digital financial literacy', role: 'Assessment design; Finlit questions are original and not a validated OECD instrument' },
   boz: { author: 'Bank of Zambia', year: 2020, title: 'Customer Complaints Handling and Resolution Directives', url: 'https://www.boz.zm/BankofZambiaCustomerComplaintsHandlingandResolutionDirectives1.pdf', section: '19.2.1: complaints first reported to the regulated entity', role: 'Provider-first complaints principle; verify current channels with regulator' },
 } as const;
-export type SourceReference = { source: keyof typeof sources; concept: string; section: string };
+export type SourceReference = { source: keyof typeof sources; concept: string; section: string; title?: string; year?: number; url?: string; location?: string; printedPages?: string | null; pdfPages?: string | null; evidenceRole?: string; locatorVerified?: boolean; verificationNotes?: string };

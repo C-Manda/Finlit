@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Field, Header, PasswordField, PrimaryButton, Screen, ToneCard } from '@/components/finlit-ui';
-import { commonStyles, palette, radii, spacing } from '@/constants/finlit-theme';
+import { radii, spacing, usePalette, useCommonStyles, themedStyles } from '@/constants/finlit-theme';
 import { useAuth } from '@/contexts/auth-context';
 import { describeSupabaseError } from '@/lib/supabase-diagnostics';
 import { validEmail, validateNewPassword } from '@/lib/password-recovery';
 
 export function LoginView() {
+  const commonStyles = useCommonStyles();
+  const styles = useStyles();
+
   const router = useRouter();
   const { signIn, signUp } = useAuth();
   const [creating, setCreating] = useState(false);
@@ -40,7 +43,7 @@ export function LoginView() {
       setError(describeSupabaseError(error));
     } finally { busy.current = false; setSubmitting(false); }
   };
-  return <Screen><Header title={creating ? 'Create account' : 'Welcome back'} back />
+  return <Screen><Header title="" back /><Text accessibilityRole="header" style={[commonStyles.title,{marginBottom:12}]}>{creating ? 'Create account' : 'Welcome back'}</Text>
     <Text style={styles.body}>{creating ? 'Start your financial learning journey.' : 'Continue your financial learning journey.'}</Text>
     <View style={styles.form}>
       {creating && <Field label="Full name" value={fullName} onChangeText={setFullName} editable={!submitting} autoComplete="name" textContentType="name" />}
@@ -59,6 +62,10 @@ export function LoginView() {
 }
 
 export function ForgotPasswordView() {
+  const styles = useStyles();
+  const palette = usePalette();
+  const commonStyles = useCommonStyles();
+
   const router = useRouter();
   const params = useLocalSearchParams<{ email?: string }>();
   const { requestPasswordReset } = useAuth();
@@ -106,6 +113,10 @@ export function ForgotPasswordView() {
 }
 
 export function ResetPasswordView() {
+  const styles = useStyles();
+  const palette = usePalette();
+  const commonStyles = useCommonStyles();
+
   const router = useRouter();
   const { session, recoveryStatus, recoveryError, updatePassword, clearPasswordRecovery, retryPasswordRecovery } = useAuth();
   const [password, setPassword] = useState('');
@@ -152,11 +163,11 @@ export function ResetPasswordView() {
     </>}
   </Screen>;
 }
-const styles = StyleSheet.create({
+const useStyles = themedStyles(palette => ({
   form: { marginTop: spacing.lg, gap: spacing.sm }, body: { color: palette.muted, fontSize: 15, lineHeight: 23 },
   heroIcon: { width: 68, height: 68, borderRadius: radii.lg, backgroundColor: palette.lilac, justifyContent: 'center', alignItems: 'center', marginTop: 20, marginBottom: 24 },
   forgotLink: { minHeight: 44, alignSelf: 'flex-end', justifyContent: 'center', paddingHorizontal: 4 },
   switchLink: { minHeight: 48, justifyContent: 'center' }, center: { textAlign: 'center', color: palette.muted, fontSize: 14, lineHeight: 22 },
-  link: { color: palette.purple, fontSize: 14, lineHeight: 22, fontWeight: '600' }, error: { color: '#8c3026', fontSize: 14, lineHeight: 21 },
+  link: { color: palette.purple, fontSize: 14, lineHeight: 22, fontWeight: '600' }, error: { color: palette.error, fontSize: 14, lineHeight: 21 },
   paragraph: { marginTop: 16, marginBottom: 18 }, state: { marginTop: 70, alignItems: 'center', gap: 18 },
-});
+}));

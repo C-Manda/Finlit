@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { palette, radii, spacing } from '@/constants/finlit-theme';
+import { radii, spacing, usePalette, themedStyles } from '@/constants/finlit-theme';
 import { curriculum, STAGE_TITLES, money, numericAnswer, allocationValues, allocationReview, validPractice, score, transition, type LessonContent, type LessonRecord, type Question } from '@/content/learning';
 
 export function LearningButton({ title, onPress, disabled = false, secondary = false }: { title: string; onPress: () => void; disabled?: boolean; secondary?: boolean }) {
+  const styles = useStyles();
+
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
     style={({ pressed }) => [styles.button, secondary && styles.secondary, disabled && styles.disabled, pressed && styles.pressed]}>
     <Text style={[styles.buttonText, secondary && styles.secondaryText]}>{title}</Text>
@@ -14,6 +16,8 @@ export function LearningButton({ title, onPress, disabled = false, secondary = f
 export function QuestionCard({ question, answer, reveal = false, disabled = false, onAnswer }: {
   question: Question; answer: number | null; reveal?: boolean; disabled?: boolean; onAnswer: (answer: number) => void;
 }) {
+  const styles = useStyles();
+
   const correct = answer === question.correct;
   return <View style={styles.stack}>
     <Text accessibilityRole="header" style={styles.heading}>{question.prompt}</Text>
@@ -32,6 +36,8 @@ export function QuestionCard({ question, answer, reveal = false, disabled = fals
   </View>;
 }
 function DefinitionCard({ definition }: { definition: LessonContent['concept']['definitions'][number] }) {
+  const styles = useStyles();
+
   const [expanded, setExpanded] = useState(false);
   return <View style={styles.card}>
     <Text style={styles.subheading}>{definition.term}</Text><Text style={styles.body}>{definition.meaning}</Text>
@@ -45,6 +51,9 @@ export function LessonPlayer({ lesson, record, saving, saveError, saved, onSave,
   lesson: LessonContent; record: LessonRecord; saving: boolean; saveError: string; saved: boolean;
   onSave: (record: LessonRecord) => Promise<boolean>; onRetrySave: () => Promise<boolean>; onReload: () => void; onExit: () => void; onAction?: () => void; onNext?: () => void;
 }) {
+  const styles = useStyles();
+  const palette = usePalette();
+
   const [draft, setDraft] = useState(record);
   const [showRecap, setShowRecap] = useState(false);
   const scroll = useRef<ScrollView>(null);
@@ -172,7 +181,7 @@ export function LessonPlayer({ lesson, record, saving, saveError, saved, onSave,
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({
+const useStyles = themedStyles(palette => ({
   page: { flex: 1, backgroundColor: palette.canvas }, header: { padding: spacing.md, borderBottomWidth: 1, borderColor: palette.line, backgroundColor: palette.surface },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 }, headerCopy: { flex: 1 }, close: { minWidth: 44, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: palette.ink, fontSize: 18, fontWeight: '600', marginTop: 4 }, eyebrow: { color: palette.purple, fontSize: 11, lineHeight: 16, fontWeight: '700', letterSpacing: 0.8 },
@@ -180,7 +189,7 @@ const styles = StyleSheet.create({
   segmentDone: { backgroundColor: palette.lilac }, segmentCurrent: { backgroundColor: palette.purple },
   scroll: { flex: 1 }, content: { width: '100%', maxWidth: 720, alignSelf: 'center', padding: spacing.lg, gap: 22, paddingBottom: 32 },
   stack: { gap: 14 },
-  title: { color: palette.ink, fontSize: 27, lineHeight: 34, fontWeight: '600' }, heading: { color: palette.ink, fontSize: 21, lineHeight: 28, fontWeight: '600' },
+  title: { color: palette.ink, fontSize: 30, lineHeight: 35, fontWeight: '500' }, heading: { color: palette.ink, fontSize: 21, lineHeight: 28, fontWeight: '500' },
   subheading: { color: palette.ink, fontSize: 16, lineHeight: 23, fontWeight: '600' }, body: { color: palette.ink, fontSize: 16, lineHeight: 25 },
   meta: { color: palette.muted, fontSize: 12, lineHeight: 18 }, card: { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, borderRadius: radii.md, padding: 18, gap: 12 },
   lilac: { backgroundColor: palette.lilac, borderColor: palette.lilac }, success: { backgroundColor: palette.mint }, caution: { backgroundColor: palette.peach },
@@ -190,11 +199,11 @@ const styles = StyleSheet.create({
   stepNumber: { color: palette.purple, fontSize: 16, fontWeight: '700', paddingTop: 3 }, stepText: { flex: 1, color: palette.ink, fontSize: 16, lineHeight: 25 },
   option: { minHeight: 54, padding: 16, borderRadius: radii.sm, borderColor: palette.line, borderWidth: 1, flexDirection: 'row', gap: 12, alignItems: 'center', backgroundColor: palette.surface },
   selected: { borderColor: palette.purple, backgroundColor: palette.lilac }, optionMarker: { fontSize: 18, color: palette.purple }, optionText: { flex: 1, fontSize: 16, lineHeight: 24, color: palette.ink },
-  input: { borderWidth: 1, borderColor: palette.purple, borderRadius: radii.sm, minHeight: 56, padding: 14, color: palette.ink, fontSize: 18, backgroundColor: palette.surface },
+  input: { borderWidth: 1, borderColor: palette.line, borderRadius: radii.sm, minHeight: 56, padding: 14, color: palette.ink, fontSize: 18, backgroundColor: palette.surface },
   feedbackSymbol: { color: palette.purple, fontSize: 32 }, textButton: { minHeight: 48, justifyContent: 'center' }, link: { color: palette.purple, fontWeight: '600', fontSize: 15, lineHeight: 23 },
   footer: { padding: spacing.md, gap: 10, backgroundColor: palette.surface, borderTopWidth: 1, borderColor: palette.line },
   saveStatus: { color: palette.muted, fontSize: 11, lineHeight: 16, textAlign: 'center' }, navigation: { flexDirection: 'row', gap: 10 }, previous: { flex: 1 }, next: { flex: 2 },
-  button: { minHeight: 50, borderRadius: radii.pill, paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.purple },
+  button: { minHeight: 50, borderRadius: radii.pill, paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.ink },
   secondary: { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line }, buttonText: { color: palette.surface, fontSize: 14, lineHeight: 21, fontWeight: '600', textAlign: 'center' },
-  secondaryText: { color: palette.purple }, disabled: { opacity: 0.45 }, pressed: { opacity: 0.75 }, error: { color: '#8c3026', fontSize: 14, lineHeight: 21 },
-});
+  secondaryText: { color: palette.ink }, disabled: { opacity: 0.45 }, pressed: { opacity: 0.75 }, error: { color: palette.error, fontSize: 14, lineHeight: 21 },
+}));

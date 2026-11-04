@@ -20,7 +20,7 @@ assert.equal(new Set(c.curriculum.flatMap(m => m.lessons.map(l => l.id))).size, 
 assert(c.curriculum.every(m => m.lessons.length === 4));
 assert.equal(c.authoredLessons.length, 24, 'Every lesson has teaching content');
 assert.equal(lesson.checkpoint.length, 3);
-assert.equal(lesson.sourceStatus, 'reviewed');
+assert.equal(lesson.sourceStatus, 'desk-reviewed');
 assert(lesson.references.length >= 2);
 assert(lesson.estimatedMinutes >= 9 && lesson.estimatedMinutes <= 12);
 assert.equal(c.LEARNING_RULES.challengeQuestions, 8);
@@ -71,7 +71,7 @@ assert(r.completed && r.practiceSubmitted, 'Review cannot reset submitted work')
 assert.throws(() => c.parseProgress('{'));
 assert.throws(() => c.parseProgress('[]'));
 assert.throws(() => c.parseProgress('{"lessons":[]}'));
-assert.throws(() => c.validateRecord(lesson, { ...c.newLessonRecord(2), stage: 6, maxStage: 6 }));
+assert.throws(() => c.validateRecord(lesson, { ...c.newLessonRecord(lesson.version), stage: 6, maxStage: 6 }));
 assert.equal(Object.keys(c.parseProgress(JSON.stringify({ lessons: { [lesson.id]: { version: 1 } } })).lessons).length, 0);
 
 const storage = new Map();
@@ -85,7 +85,7 @@ const service = load('services/sample-progress.ts', {
   '@/content/learning': c, '@/content/authored': c,
 });
 (async () => {
-  let saved = c.newLessonRecord(2);
+  let saved = c.newLessonRecord(lesson.version);
   let next = c.transition(lesson, saved, { type: 'next' });
   await service.saveSampleProgress('alice', lesson.id, next, saved);
   assert.equal((await service.loadSampleProgress('alice')).lessons[lesson.id].stage, 1);

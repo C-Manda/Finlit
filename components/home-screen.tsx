@@ -1,8 +1,9 @@
+import { HomeBudgetChart } from './home-budget-chart';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { palette, radii } from '@/constants/finlit-theme';
+import { radii, usePalette, themedStyles } from '@/constants/finlit-theme';
 import { curriculum } from '@/content/learning';
 import { moduleAvailable, recommendation } from '@/content/progression';
 import { useAuth } from '@/contexts/auth-context';
@@ -12,6 +13,9 @@ import { LearningButton } from './lesson-player';
 import { LearningStatus } from './learning-screens';
 
 export function HomeScreen() {
+  const styles = useStyles();
+  const palette = usePalette();
+
   const router = useRouter();
   const { user } = useAuth();
   const state = useLearning();
@@ -56,13 +60,14 @@ export function HomeScreen() {
           <View style={styles.moduleStatus}><Ionicons name={passed ? 'checkmark-circle-outline' : available ? 'arrow-forward' : 'lock-closed-outline'} size={14} color={palette.muted} /><Text style={styles.muted}>{passed ? 'Completed' : available ? 'Explore' : 'Locked'}</Text></View>
         </Pressable>;
       })}</View>
+      <HomeBudgetChart/>
       {state.progress.journey?.baseline&&<LearningButton title={`Knowledge profile · ${state.progress.journey.baseline.score}/${state.progress.journey.baseline.total}`} secondary onPress={()=>router.push('/knowledge-profile' as never)}/>}
       {state.progress.journey?.finalAvailable&&<LearningButton title={state.progress.journey.final?'View learning comparison':'Take final assessment'} onPress={()=>router.push((state.progress.journey?.final?'/learning-comparison':'/final-assessment') as never)}/>}
     </>}
   </View></Screen></StudentShell>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles(palette => ({
   stack: { gap: 20 },
   userbar: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center' },
@@ -92,4 +97,4 @@ const styles = StyleSheet.create({
   moduleTitle: { fontSize: 15, lineHeight: 21, color: palette.ink, fontWeight: '500' },
   moduleStatus: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
   pressed: { opacity: 0.75 },
-});
+}));

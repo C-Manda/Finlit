@@ -5,7 +5,7 @@ export const STAGE_TITLES = ['Situation', 'Concept', 'Worked example', 'Practice
 export type Question = { id: string; prompt: string; options: { text: string; feedback: string }[]; correct: number; explanation: string };
 export type LessonContent = {
   id: string; moduleId: string; title: string; version: number; estimatedMinutes: number;
-  sourceStatus: 'reviewed'; citations: string[]; references: SourceReference[];
+  sourceStatus: 'reviewed' | 'desk-reviewed'; academicAudit?: { status: string; coreSource: string; coreSection: string; corePrintedPages: string | null; corePdfPages: string | null; policy: string; scope: string; duration: string; reviewedOn: string };  citations: string[]; references: SourceReference[];
   action?: { actionType: 'open_budget'; destination: 'create' | 'transaction' | 'overview'; label: string; optional: true }; introduction: string; outcomes: string[];
   situation: { title: string; body: string; figures: { label: string; value: string }[]; reflection: string; choices: string[] };
   concept: { title: string; introduction: string; takeaway: string; definitions: { term: string; meaning: string; detail: string }[] };

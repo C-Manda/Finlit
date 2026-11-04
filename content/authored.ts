@@ -1,7 +1,8 @@
 // Authoring and glossary data. The runtime lesson player loads only one lesson from Supabase.
+import { polishLesson } from './academic-polish';
 import { additionalLessons } from './curriculum-lessons';
 import { LEARNING_RULES, type LessonContent } from './learning';
-export const sampleLesson: LessonContent = {
+const baseSampleLesson: LessonContent = {
   id: 'lesson-2-1', moduleId: 'module-2', title: 'Understanding budgets', version: 2, estimatedMinutes: LEARNING_RULES.estimatedMinutes,
   sourceStatus: 'reviewed', citations: ['nsfe', 'ilo', 'worldbank', 'finscope', 'council'], references: [{ source: 'council', section: 'Session 10: Think About the Future: Money In and Money Out', concept: 'Original exercise applying income and expense planning' }, { source: 'finscope', section: '7.2 Cash-flow Management', concept: 'Budgeting and spending records in Zambian context' }, { source: 'nsfe', section: 'Priority programmes for children and youth', concept: 'Practical financial capability' }, { source: 'ilo', section: 'Session 7: Budget and budgeting', concept: 'Planning income and expenses' }, { source: 'worldbank', section: 'Financial capability', concept: 'Budgeting and monitoring expenditure in Zambia' }], action: { actionType: 'open_budget', destination: 'overview', label: 'Explore a Budget', optional: true },
   introduction: 'Help a fictional student turn a monthly allowance into a workable spending plan.',
@@ -70,4 +71,5 @@ export const sampleLesson: LessonContent = {
   summaryTitle: 'A plan you can review and adjust',
   takeaways: ['Plan money and costs for the same period.', 'Subtract total planned expenses from money available to find the remainder.', 'Review new costs and their consequences before changing a plan.'],
 };
+export const sampleLesson = polishLesson(baseSampleLesson);
 export const authoredLessons: LessonContent[] = [...additionalLessons, sampleLesson].sort((a, b) => a.id.localeCompare(b.id));

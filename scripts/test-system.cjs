@@ -54,7 +54,7 @@ async function take(key,correctCount){
 (async()=>{
  assert.equal(c.authoredLessons.length,24);assert.equal(c.curriculum.length,6);
  assert.equal(new Set(c.authoredLessons.flatMap(l=>l.checkpoint.map(q=>q.id))).size,72);
- for(const l of c.authoredLessons){assert.equal(l.checkpoint.length,3);assert(l.references.length>=2);assert(l.situation.body.length>100);assert(l.concept.introduction.length>200);assert(l.example.steps.length>=3);assert(l.takeaways.length>=2&&l.takeaways.length<=3);assert.equal(l.sourceStatus,'reviewed');for(const q of l.checkpoint){assert(q.options[q.correct]);assert(q.options.every(o=>o.feedback.length>10));}}
+ for(const l of c.authoredLessons){assert.equal(l.checkpoint.length,3);assert(l.references.length>=2);assert(l.situation.body.length>100);assert(l.concept.introduction.length>200);assert(l.example.steps.length>=3);assert(l.takeaways.length>=2&&l.takeaways.length<=3);assert.equal(l.sourceStatus,'desk-reviewed');for(const q of l.checkpoint){assert(q.options[q.correct]);assert(q.options.every(o=>o.feedback.length>10));}}
  assert.equal(c.sampleLesson.practice.correct,1500-1300-80);
  const allocationLesson=c.authoredLessons.find(l=>l.id==='lesson-2-2');
  const allocated={accommodation:'600',food:'120',transport:'60',data:'30',materials:'20'};
@@ -72,8 +72,8 @@ async function take(key,correctCount){
  const fixture={plans:[plan],entries,categories:[{id:'food',name:'Food',entry_type:'expense'}],insights:false};
  assert.equal(b.budgetTotals(plan,entries).spent,80);assert.equal(b.budgetInsights(fixture,plan).length,0);fixture.insights=true;assert.equal(b.budgetInsights(fixture,plan)[0].id,'near-food');entries[0].amount=120;assert.equal(b.budgetInsights(fixture,plan)[0].id,'over-food');
  await setup(db);
- // Repeat migrations against the same data to check idempotency before learner records exist.
- for(const f of migrations)await migrate(db,f);
+ // Historical item-bank migrations must refuse to overwrite the polished bank.
+ for(const f of migrations){await assert.rejects(()=>migrate(db,f),/Option revision requires/);await db.exec('rollback');}
  assert.equal((await query('select count(*)::int n from public.lessons where is_published'))[0].n,24);
  await db.query('insert into auth.users(id) values($1),($2)',[alice,bob]);
  await as(null);await rejected(()=>api('snapshot'),/permission denied/);
@@ -126,8 +126,8 @@ async function take(key,correctCount){
  await rejected(()=>api('result',{attempt:diagnostic.attempt.id}),/unavailable/);
  await rejected(()=>api('answer',{attempt:diagnostic.attempt.id,question:randomUUID(),option:randomUUID(),revision:0}),/unavailable/);
  await as(alice);const key='lesson-1-1',r=(await api('snapshot')).lessons[key];await api('save_lesson',{key,expected:r,record:{...r,stage:1}});await rejected(()=>api('save_lesson',{key,expected:r,record:{...r,stage:2}}),/another view/);
- await db.exec('reset role');for(const f of migrations)await migrate(db,f);await as(alice);assert.equal((await api('snapshot')).modules.length,6);
+ await db.exec('reset role');for(const f of migrations){await assert.rejects(()=>migrate(db,f),/Option revision requires/);await db.exec('rollback');}await as(alice);assert.equal((await api('snapshot')).modules.length,6);
  assert.equal(new Set(forms.flatMap(f=>f.questions.map(q=>q.prompt))).size,36);
  for(const form of forms)for(let i=1;i<=6;i++){const qs=form.questions.filter(q=>q.topic==='module-'+i);assert.equal(qs.length,3);assert.deepEqual(qs.map(q=>q.kind),['conceptual','application','decision']);}
- console.log('PASS: 24 lessons, 72 checkpoints, 6 challenges, diagnostic, seven-stage progression, 5/8 fail and 6/8 pass, retake history, immutable completion, idempotent saves, stale writes, RLS/account isolation, budget periods, categories, amounts, consent and insight rules. Migrations repeat safely on the disposable repository-schema fixture.');
+ console.log('PASS: 24 lessons, 72 checkpoints, 6 challenges, diagnostic, seven-stage progression, 5/8 fail and 6/8 pass, retake history, immutable completion, idempotent saves, stale writes, RLS/account isolation, budget periods, categories, amounts, consent and insight rules. Historical item-bank replay safely refuses to overwrite revised content.');
 })().catch(e=>{console.error(e.message);if(e.query)console.error(e.query.slice(0,1200));process.exitCode=1;}).finally(()=>db.close());

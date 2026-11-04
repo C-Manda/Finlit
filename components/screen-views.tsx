@@ -1,58 +1,240 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Redirect, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { commonStyles, palette, radii, spacing } from '@/constants/finlit-theme';
-import { PrimaryButton, Screen, StudentShell } from './finlit-ui';
-import { useAuth } from '@/contexts/auth-context';
-import { useProfile } from '@/hooks/use-profile';
-import { describeSupabaseError } from '@/lib/supabase-diagnostics';
-import { LearningPath } from './learning-screens';
-import { BudgetScreen } from './budget-screens';
-export { LoginView } from './auth-views';
-export { HomeScreen as HomeView } from './home-screen';
+import { Ionicons } from "@expo/vector-icons";
+import { Redirect, useRouter } from "expo-router";
+import { useState } from "react";
+import { Pressable, Text, View } from "react-native";
+import {
+  radii,
+  spacing,
+  usePalette,
+  useCommonStyles,
+  themedStyles,
+} from "@/constants/finlit-theme";
+import { PrimaryButton, Screen, StudentShell } from "./finlit-ui";
+import { useAuth } from "@/contexts/auth-context";
+import { useProfile } from "@/hooks/use-profile";
+import { describeSupabaseError } from "@/lib/supabase-diagnostics";
+import { LearningPath } from "./learning-screens";
+import { BudgetScreen } from "./budget-screens";
+export { LoginView } from "./auth-views";
+export { HomeScreen as HomeView } from "./home-screen";
 export const LearnView = LearningPath;
 export const RecommendedView = LearningPath;
-export { JourneyScreen as ProgressView } from './knowledge-views';
+export { JourneyScreen as ProgressView } from "./knowledge-views";
 export const BudgetView = BudgetScreen;
-export function AddEntryView() { return <BudgetScreen mode="transaction" />; }
+export function AddEntryView() {
+  return <BudgetScreen mode="transaction" />;
+}
 export const BudgetSummaryView = BudgetScreen;
-function LearningRedirect() { return <Redirect href="/learn" />; }
+function LearningRedirect() {
+  return <Redirect href="/learn" />;
+}
 export const ExplanationView = LearningRedirect;
 export const ScenarioView = LearningRedirect;
 export const FeedbackView = LearningRedirect;
 export const ActivityView = LearningRedirect;
 export const QuizView = LearningRedirect;
 export const ResultView = LearningRedirect;
-export function SavedExplanationsView() { return <Redirect href={"/glossary" as never} />; }
+export function SavedExplanationsView() {
+  return <Redirect href={"/glossary" as never} />;
+}
 export function WelcomeView() {
+  const styles = useStyles();
+  const commonStyles = useCommonStyles();
+
   const router = useRouter();
-  return <Screen><View style={styles.welcome}><Text style={styles.brand}>FINLIT</Text><View style={styles.hero}><Text style={styles.heroMark}>K</Text><View style={styles.heroDot} /></View><Text style={commonStyles.title}>Build better{`\n`}money habits</Text><Text style={[commonStyles.body, styles.welcomeBody]}>Short lessons. Practical decisions. Progress you can see.</Text><PrimaryButton title="Get started" onPress={() => router.push('/login')} /><Pressable onPress={() => router.push('/login')}><Text style={styles.centerLink}>Already have an account? Log in</Text></Pressable></View></Screen>;
+  return (
+    <Screen>
+      <View style={styles.welcome}>
+        <Text style={styles.brand}>FINLIT</Text>
+        <View style={styles.hero}>
+          <Text style={styles.heroMark}>K</Text>
+          <View style={styles.heroDot} />
+        </View>
+        <Text style={commonStyles.title}>Build better{`\n`}money habits</Text>
+        <Text style={[commonStyles.body, styles.welcomeBody]}>
+          Short lessons. Practical decisions. Progress you can see.
+        </Text>
+        <PrimaryButton
+          title="Get started"
+          onPress={() => router.push("/login")}
+        />
+        <Pressable onPress={() => router.push("/login")}>
+          <Text style={styles.centerLink}>Already have an account? Log in</Text>
+        </Pressable>
+      </View>
+    </Screen>
+  );
 }
 
 export function ProfileView() {
+  const styles = useStyles();
+  const palette = usePalette();
+  const commonStyles = useCommonStyles();
+
   const router = useRouter();
   const { signOut, user } = useAuth();
   const { profile, isLoading, error } = useProfile();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [signOutError, setSignOutError] = useState('');
-  const initials = (profile?.full_name ?? user?.email ?? 'U').slice(0, 2).toUpperCase();
+  const [signOutError, setSignOutError] = useState("");
+  const initials = (profile?.full_name ?? user?.email ?? "U")
+    .slice(0, 2)
+    .toUpperCase();
   const logOut = async () => {
     if (isSigningOut) return;
-    setIsSigningOut(true); setSignOutError('');
+    setIsSigningOut(true);
+    setSignOutError("");
     try {
       const result = await signOut();
-      if (result.error) setSignOutError('We could not log you out. Please try again.');
-    } catch { setSignOutError('We could not log you out. Please try again.'); }
-    finally { setIsSigningOut(false); }
+      if (result.error)
+        setSignOutError("We could not log you out. Please try again.");
+    } catch {
+      setSignOutError("We could not log you out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
+    }
   };
-  return <StudentShell><Screen><View style={styles.profile}><View style={styles.profileAvatar}><Text>{initials}</Text></View><Text style={commonStyles.heading}>{profile?.full_name ?? 'Your profile'}</Text><Text style={commonStyles.body}>{user?.email ?? 'Your account'}</Text></View>{isLoading ? <Text style={commonStyles.body}>Loading profile...</Text> : null}{error ? <Text accessibilityRole="alert" style={styles.error}>{describeSupabaseError(error, 'Your profile could not be loaded. Please try again.')}</Text> : null}<Pressable accessibilityRole="button" style={styles.savedItem} onPress={() => router.push('/progress')}><Ionicons name="bar-chart-outline" size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>Learning progress</Text><Text style={commonStyles.label}>Review your lessons</Text></View><Ionicons name="chevron-forward" size={17} color={palette.muted} /></Pressable><Pressable accessibilityRole="button" style={styles.savedItem} onPress={() => router.push('/glossary' as never)}><Ionicons name="bookmark-outline" size={20} /><View style={{ flex: 1 }}><Text style={styles.moduleTitle}>Financial glossary</Text><Text style={commonStyles.label}>Review key concepts</Text></View><Ionicons name="chevron-forward" size={17} color={palette.muted} /></Pressable>{signOutError ? <Text accessibilityRole="alert" style={styles.error}>{signOutError}</Text> : null}<PrimaryButton title={isSigningOut ? 'Logging out...' : 'Log out'} tone="outline" disabled={isSigningOut} onPress={() => { void logOut(); }} /></Screen></StudentShell>;
+  return (
+    <StudentShell>
+      <Screen>
+        <View style={styles.profile}>
+          <View style={styles.profileAvatar}>
+            <Text style={{ color: palette.ink, fontSize: 22 }}>{initials}</Text>
+          </View>
+          <Text style={commonStyles.heading}>
+            {profile?.full_name ?? "Your profile"}
+          </Text>
+          <Text style={commonStyles.body}>{user?.email ?? "Your account"}</Text>
+        </View>
+        {isLoading ? (
+          <Text style={commonStyles.body}>Loading profile...</Text>
+        ) : null}
+        {error ? (
+          <Text accessibilityRole="alert" style={styles.error}>
+            {describeSupabaseError(
+              error,
+              "Your profile could not be loaded. Please try again.",
+            )}
+          </Text>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          style={styles.savedItem}
+          onPress={() => router.push("/progress")}
+        >
+          <Ionicons name="bar-chart-outline" size={20} color={palette.ink} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.moduleTitle}>Learning progress</Text>
+            <Text style={commonStyles.label}>Review your lessons</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={17} color={palette.muted} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          style={styles.savedItem}
+          onPress={() => router.push("/glossary" as never)}
+        >
+          <Ionicons name="bookmark-outline" size={20} color={palette.ink} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.moduleTitle}>Financial glossary</Text>
+            <Text style={commonStyles.label}>Review key concepts</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={17} color={palette.muted} />
+        </Pressable>
+        {signOutError ? (
+          <Text accessibilityRole="alert" style={styles.error}>
+            {signOutError}
+          </Text>
+        ) : null}
+        <PrimaryButton
+          title={isSigningOut ? "Logging out..." : "Log out"}
+          tone="outline"
+          disabled={isSigningOut}
+          onPress={() => {
+            void logOut();
+          }}
+        />
+      </Screen>
+    </StudentShell>
+  );
 }
 
-const styles = StyleSheet.create({
-  error: { color: '#a44a4a', fontSize: 13, lineHeight: 19, marginTop: spacing.sm },
-  moduleTitle: { color: palette.ink, fontSize: 13, fontWeight: '500' },
-  moduleItem: { padding: spacing.md, borderRadius: radii.md, backgroundColor: palette.mint, marginBottom: spacing.sm },
-  wideValue: { color: palette.ink, fontSize: 24, fontWeight: '500' },
-  welcome: { flex: 1, justifyContent: 'flex-end', paddingBottom: 28 }, brand: { position: 'absolute', top: 20, left: 0, color: palette.ink, fontSize: 13, letterSpacing: 3 }, hero: { alignSelf: 'center', width: 215, height: 215, marginBottom: spacing.xl, borderRadius: 110, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center' }, heroMark: { color: palette.ink, fontSize: 48, fontWeight: '500', transform: [{ rotate: '8deg' }], backgroundColor: palette.blue, paddingHorizontal: 35, paddingVertical: 15, borderRadius: 18 }, heroDot: { position: 'absolute', right: 24, top: 30, width: 38, height: 38, borderRadius: 20, backgroundColor: '#e7b65e' }, welcomeBody: { marginTop: 12, marginBottom: 16 }, centerLink: { color: palette.muted, textAlign: 'center', fontSize: 11, marginTop: 15 }, boldLink: { color: palette.ink, fontWeight: '500' }, form: { marginTop: spacing.xl }, rightLink: { color: palette.muted, fontSize: 11, textAlign: 'right', marginVertical: 2 }, step: { color: palette.muted, fontSize: 11, marginBottom: 8 }, tag: { alignSelf: 'flex-start', color: palette.ink, backgroundColor: palette.blush, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 6, fontSize: 10, letterSpacing: 1, marginVertical: spacing.md }, equation: { marginVertical: spacing.md, alignItems: 'center' }, equationText: { color: palette.ink, fontSize: 13, lineHeight: 22, textAlign: 'center' }, option: { minHeight: 48, borderRadius: radii.sm, borderWidth: 1, borderColor: '#d9d4d6', paddingHorizontal: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }, selectedOption: { borderColor: palette.ink, backgroundColor: palette.lilac }, optionText: { fontSize: 13, color: palette.ink }, optionLetter: { width: 25, height: 25, borderRadius: 13, textAlign: 'center', paddingTop: 4, backgroundColor: '#ece8ea' }, bigIcon: { alignSelf: 'center', width: 114, height: 114, marginTop: 42, marginBottom: 15, borderRadius: 36, backgroundColor: palette.lilac, alignItems: 'center', justifyContent: 'center' }, center: { textAlign: 'center' }, scoreRow: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, borderColor: palette.line, paddingVertical: 14, marginVertical: spacing.md }, score: { flex: 1, alignItems: 'center' }, scoreValue: { color: palette.ink, fontSize: 18, fontWeight: '500' }, scoreLabel: { color: palette.muted, fontSize: 10, marginTop: 3 }, userBar: { flexDirection: 'row', alignItems: 'center', gap: 10 }, avatar: { width: 38, height: 38, borderRadius: 20, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center' }, userCopy: { flex: 1 }, userName: { color: palette.ink, fontSize: 13, fontWeight: '500' }, homeTitle: { marginTop: 24 }, streak: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8 }, course: { minHeight: 188, marginTop: 18, overflow: 'hidden' }, courseEyebrow: { color: palette.muted, fontSize: 9 }, courseTitle: { position: 'absolute', left: 16, bottom: 28, color: palette.ink, fontSize: 18, fontWeight: '500' }, courseDetail: { position: 'absolute', left: 16, bottom: 12, color: palette.muted, fontSize: 10 }, courseArt: { position: 'absolute', right: 24, top: 48, width: 112, height: 72, borderRadius: 16, backgroundColor: palette.teal, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '7deg' }] }, courseMark: { fontSize: 38, color: palette.ink }, miniModules: { flexDirection: 'row', gap: 9 }, mini: { flex: 1, minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 7 }, streakPill: { color: palette.ink, backgroundColor: palette.peach, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 7, fontSize: 10 }, moduleList: { marginTop: spacing.lg }, wideArt: { minHeight: 155, marginBottom: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 22 }, wideMark: { fontSize: 30, backgroundColor: palette.blush, paddingHorizontal: 25, paddingVertical: 10, borderRadius: 13, transform: [{ rotate: '7deg' }] }, meta: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 14, paddingVertical: 11, borderTopWidth: 1, borderBottomWidth: 1, borderColor: palette.line, textAlign: 'center' }, metaLabel: { color: palette.muted, fontSize: 9 }, stage: { minHeight: 53, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderColor: palette.line }, stageNumber: { width: 29, height: 29, borderRadius: 15, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' }, lessonArt: { minHeight: 110, alignItems: 'center', justifyContent: 'center', marginVertical: 12 }, lessonText: { color: palette.muted, fontSize: 13, lineHeight: 20, marginBottom: 12 }, subheading: { color: palette.ink, fontSize: 14, fontWeight: '500', marginTop: 6, marginBottom: 5 }, aiStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 12 }, aiHero: { flexDirection: 'row', alignItems: 'center', gap: 10 }, segment: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: radii.pill, backgroundColor: '#ece8ea', marginVertical: 16 }, segmentItem: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill }, segmentSelected: { backgroundColor: palette.surface }, notice: { flexDirection: 'row', alignItems: 'center', gap: 9, marginVertical: 14 }, budgetSummary: { marginVertical: 12 }, amount: { color: palette.ink, fontSize: 25, fontWeight: '500' }, entry: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderColor: palette.line }, total: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#ece8ea', borderRadius: 14, marginVertical: 14 }, balance: { marginVertical: 16 }, balanceAmount: { color: palette.ink, fontSize: 30, fontWeight: '500', marginVertical: 5 }, positive: { color: '#367668' }, checkbox: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 38 }, donut: { alignSelf: 'center', width: 170, height: 170, borderRadius: 90, marginVertical: 14, backgroundColor: palette.teal, alignItems: 'center', justifyContent: 'center' }, donutInner: { width: 112, height: 112, borderRadius: 60, backgroundColor: palette.canvas, alignItems: 'center', justifyContent: 'center' }, legend: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8 }, dot: { width: 9, height: 9, borderRadius: 5 }, noticeText: { color: palette.muted, backgroundColor: '#ece8ea', padding: 11, borderRadius: 13, fontSize: 12, lineHeight: 17, marginVertical: 10 }, resultRing: { alignSelf: 'center', width: 142, height: 142, borderRadius: 72, borderWidth: 15, borderColor: palette.teal, marginTop: 45, marginBottom: 18, alignItems: 'center', justifyContent: 'center' }, resultValue: { color: palette.ink, fontSize: 30, fontWeight: '500' }, chart: { height: 130, marginVertical: 15, borderBottomWidth: 1, borderColor: '#cfc9cc', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', paddingHorizontal: 15 }, chartBar: { width: 25, borderRadius: 8, backgroundColor: '#dca5be' }, savedItem: { minHeight: 65, flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderColor: palette.line }, profile: { alignItems: 'center', marginVertical: 24 }, profileAvatar: { width: 78, height: 78, borderRadius: 40, backgroundColor: palette.mint, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-});
+const useStyles = themedStyles((palette) => ({
+  error: {
+    color: palette.error,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: spacing.sm,
+  },
+  moduleTitle: { color: palette.ink, fontSize: 13, fontWeight: "500" },
+  welcome: {
+    minHeight: 590,
+    backgroundColor: palette.blush,
+    borderRadius: radii.lg,
+    padding: 20,
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingBottom: 28,
+  },
+  brand: {
+    position: "absolute",
+    top: 20,
+    left: 20,
+    color: palette.ink,
+    fontSize: 13,
+    letterSpacing: 3,
+  },
+  hero: {
+    alignSelf: "center",
+    width: 215,
+    height: 215,
+    marginBottom: spacing.xl,
+    borderRadius: 110,
+    backgroundColor: palette.mint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroMark: {
+    color: palette.ink,
+    fontSize: 48,
+    fontWeight: "500",
+    transform: [{ rotate: "8deg" }],
+    backgroundColor: palette.blue,
+    paddingHorizontal: 35,
+    paddingVertical: 15,
+    borderRadius: 18,
+  },
+  heroDot: {
+    position: "absolute",
+    right: 24,
+    top: 30,
+    width: 38,
+    height: 38,
+    borderRadius: 20,
+    backgroundColor: "#e7b65e",
+  },
+  welcomeBody: { marginTop: 12, marginBottom: 16 },
+  centerLink: {
+    color: palette.muted,
+    textAlign: "center",
+    fontSize: 11,
+    marginTop: 15,
+  },
+  savedItem: {
+    minHeight: 65,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderBottomWidth: 1,
+    borderColor: palette.line,
+  },
+  profile: { alignItems: "center", marginVertical: 24 },
+  profileAvatar: {
+    width: 78,
+    height: 78,
+    borderRadius: 40,
+    backgroundColor: palette.mint,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+}));

@@ -348,6 +348,50 @@ export type Database = {
         }
         Relationships: []
       }
+      balance_adjustments: {
+        Row: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at: string
+          id: string
+          location_id: string
+          reason: string
+          request_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at?: string
+          id?: string
+          location_id: string
+          reason?: string
+          request_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          balance_before?: number
+          created_at?: string
+          id?: string
+          location_id?: string
+          reason?: string
+          request_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_adjustments_user_id_location_id_fkey"
+            columns: ["user_id", "location_id"]
+            isOneToOne: false
+            referencedRelation: "money_locations"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       budget_plans: {
         Row: {
           allocations: Json
@@ -414,44 +458,86 @@ export type Database = {
       financial_entries: {
         Row: {
           amount: number
-          category_id: string
+          category_id: string | null
           created_at: string
+          deleted_at: string | null
           description: string | null
+          destination_location_id: string | null
           entry_type: string
+          fee_amount: number
+          fee_category_id: string | null
           id: string
+          import_metadata: Json | null
+          location_id: string | null
           occurred_on: string
           request_id: string | null
+          revision: number
           updated_at: string
           user_id: string
         }
         Insert: {
           amount: number
-          category_id: string
+          category_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
+          destination_location_id?: string | null
           entry_type: string
+          fee_amount?: number
+          fee_category_id?: string | null
           id?: string
+          import_metadata?: Json | null
+          location_id?: string | null
           occurred_on?: string
           request_id?: string | null
+          revision?: number
           updated_at?: string
           user_id: string
         }
         Update: {
           amount?: number
-          category_id?: string
+          category_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
+          destination_location_id?: string | null
           entry_type?: string
+          fee_amount?: number
+          fee_category_id?: string | null
           id?: string
+          import_metadata?: Json | null
+          location_id?: string | null
           occurred_on?: string
           request_id?: string | null
+          revision?: number
           updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "entry_destination_owner"
+            columns: ["user_id", "destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "money_locations"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "entry_source_owner"
+            columns: ["user_id", "location_id"]
+            isOneToOne: false
+            referencedRelation: "money_locations"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
             foreignKeyName: "financial_entries_category_id_fkey"
             columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "financial_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_entries_fee_category_id_fkey"
+            columns: ["fee_category_id"]
             isOneToOne: false
             referencedRelation: "financial_categories"
             referencedColumns: ["id"]
@@ -718,6 +804,51 @@ export type Database = {
           sort_order?: number
           title?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      money_locations: {
+        Row: {
+          active: boolean
+          colour: string
+          created_at: string
+          id: string
+          location_type: string
+          nickname: string
+          opening_balance: number
+          opening_date: string
+          provider: string
+          request_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          colour: string
+          created_at?: string
+          id?: string
+          location_type: string
+          nickname?: string
+          opening_balance?: number
+          opening_date?: string
+          provider: string
+          request_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          colour?: string
+          created_at?: string
+          id?: string
+          location_type?: string
+          nickname?: string
+          opening_balance?: number
+          opening_date?: string
+          provider?: string
+          request_id?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

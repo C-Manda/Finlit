@@ -1,3 +1,4 @@
+import { polishLesson } from './academic-polish';
 import type { LessonContent, Question } from './learning';
 import type { SourceReference } from './sources';
 
@@ -280,7 +281,7 @@ const numericPractices: Record<string, { prompt: string; context: string; correc
   '6-2': { prompt: 'How much extra is needed for five baskets?', context: 'The same basket rose from K100 to K110. Brian previously bought five baskets for K500. Calculate the additional money needed to buy five now.', correct: 50, explanation: 'Five baskets now cost 5 × K110 = K550. K550 − K500 = K50 extra. The unchanged K500 has less purchasing power for this fictional basket.' },
 };
 
-export const additionalLessons: LessonContent[] = seeds.map((s, index) => {
+export const additionalLessons: LessonContent[] = seeds.map((s, index): LessonContent => {
   const references: SourceReference[] = [
     { source: 'nsfe', section: 'Priority programmes for children and youth; tertiary education', concept: 'Practical financial capability for students' },
     { source: Number(s.n[0]) < 5 ? 'ilo' : 'oecd', section: Number(s.n[0]) < 5 ? ({ '1-1': 'Session 9: Pathways to earning money', '1-2': 'Session 4: Savings plan and spending decision', '1-3': 'Session 7: Budget and budgeting', '1-4': 'Session 8: Financial negotiations', '2-2': 'Session 7: Budget and budgeting', '2-3': 'Session 7: Budget and budgeting', '2-4': 'Session 7: Budget and budgeting', '3-1': 'Session 3: Savings and savings options', '3-2': 'Session 2: Financial goals setting', '3-3': 'Session 3: Savings and savings options', '3-4': 'Session 6: Risk management and insurance', '4-1': 'Session 5: Equity or debt financing', '4-2': 'Session 5: Equity or debt financing', '4-3': 'Session 5: Equity or debt financing', '4-4': 'Session 8: Financial negotiations' }[s.n] ?? 'Part II: Trainer’s manual') : 'Money and transactions; risk and reward; financial landscape', concept: s.objective },
@@ -314,4 +315,4 @@ export const additionalLessons: LessonContent[] = seeds.map((s, index) => {
     summaryTitle: 'Bring the ideas together', takeaways: s.takeaways,
     ...(s.n[0] === '2' ? { action: { actionType: 'open_budget' as const, destination: s.n === '2-2' ? 'create' as const : s.n === '2-3' ? 'transaction' as const : 'overview' as const, label: s.n === '2-2' ? 'Create My Budget' : s.n === '2-3' ? 'Record a Transaction' : 'Review My Budget', optional: true as const } } : {}),
   };
-});
+}).map(polishLesson);

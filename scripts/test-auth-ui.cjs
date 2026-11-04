@@ -61,6 +61,10 @@ async function shot(name) {
   assert.doesNotMatch(body,/development sample|sources not yet validated|published module|secure server grading|database schema|Supabase/i);
   const output=await send('Page.captureScreenshot',{format:'png'});
   fs.writeFileSync(path.join(root,name+'.png'),Buffer.from(output.data,'base64'));
+  await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'}]});await delay(150);
+  assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'Dark theme horizontal overflow');
+  const dark=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(root,name+'-dark.png'),Buffer.from(dark.data,'base64'));
+  await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'light'}]});await delay(100);
 }
 async function fulfill(event) {
   const req=event.request, url=new URL(req.url);
@@ -83,7 +87,7 @@ async function fulfill(event) {
     if(action==='snapshot')data={lessons:{},modules:[],diagnostic:null};
     else if(action==='journey')data={required:initialRequired,legacy:!initialRequired,baseline:null,final:null,finalAvailable:false,priorities:[],comparison:{available:false,comparable:false}};
     else if(action==='assessment'){const form=require('./knowledge-content.cjs').forms[0];data={assessment:{id:'fixture',title:form.title,assessment_type:'diagnostic',content_key:form.key},attempt:null,answers:{},history:[],questions:form.questions.map((q,i)=>({id:'question-'+i,prompt:q.prompt,topic:q.topic,options:q.options.map((text,j)=>({id:'option-'+i+'-'+j,text}))}))};}
-    else if(action==='budget')data={plans:[],entries:[],categories:[{id:'10000000-0000-4000-a000-000000000099',name:'Food',entry_type:'expense'}],insights:false};
+    else if(action==='budget')data={plans:[],entries:[],categories:[{id:'10000000-0000-4000-a000-000000000099',name:'Food & groceries',entry_type:'expense'}],insights:false};
     else {status=400;data={code:'fixture_denied',message:'Unexpected learning action in auth test'};}
   } else if(url.pathname.startsWith('/rest/v1/')) data=[];
   else if(url.pathname!=='/auth/v1/logout') {status=400;data={code:'fixture_denied',msg:'Unmocked API call blocked'};}
@@ -216,6 +220,9 @@ async function fulfill(event) {
   assert(await evaluate('document.body.innerText.includes("master today?")'),'Home mockup heading missing');
   assert(!await evaluate('document.body.innerText.includes("Build your financial confidence")'),'Home still duplicates Learn');
   await shot('home-dashboard-390');
+  await until('document.body.innerText.includes("This month’s spending")','Home budget chart missing');
+  await evaluate(`Array.from(document.querySelectorAll('[role=heading]')).find(e=>e.textContent==='This month’s spending').scrollIntoView({block:'start'})`);await shot('home-budget-chart');
+  await evaluate('document.querySelectorAll("div").forEach(e=>{if(e.scrollTop)e.scrollTop=0})');
   await send('Emulation.setDeviceMetricsOverride',{width:320,height:640,deviceScaleFactor:1,mobile:true});
   assert(await evaluate('document.documentElement.scrollWidth <= innerWidth'),'Home overflows at 320px');
   await shot('home-dashboard-320');
