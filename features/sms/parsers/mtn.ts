@@ -10,10 +10,10 @@ export function parseMtn(m:SmsMessage){
  if(/Your Mobile Money account balance is ZMW|balance notification|account balance is/i.test(b))return result(m,'mtn','balance_check',null,balance,null);
  if(/Payment of\s*ZMW/i.test(b)&&/data bundle|successfully purchased|\bdata\b/i.test(b))return result(m,'mtn','data_purchase',amount(b,`Payment of\\s*ZMW\\s*(${NUMBER})`),balance,ref);
  if(/Payment of\s*ZMW/i.test(b)&&/airtime|top[- ]?up/i.test(b))return result(m,'mtn','airtime_purchase',amount(b,`Payment of\\s*ZMW\\s*(${NUMBER})`),balance,ref);
- if(/(?:received|payment).*?(?:Airtel NFS|AIRTEL NFS)/i.test(b))return result(m,'mtn','bank_transfer',amount(b,`(?:received|payment).*?ZMW\\s*(${NUMBER})`),balance,ref);
- if(/Payment.*?AIRTEL NFS/i.test(b))return result(m,'mtn','bank_transfer',amount(b,`Payment.*?ZMW\\s*(${NUMBER})`),balance,ref);
- if(/You have received ZMW.+on your mobile money account at/i.test(b))return result(m,'mtn','received',amount(b,`received ZMW\\s*(${NUMBER})`),balance,ref);
- if(/You have withdrawn.+(?:ZMW|from your mobile money account)/i.test(b))return result(m,'mtn','withdrawal',amount(b,`withdrawn\\s*(?:ZMW\\s*)?(${NUMBER})\\s*(?:ZMW)?`),balance,ref);
+ if(/received.*?(?:Airtel NFS|AIRTEL NFS)/i.test(b))return result(m,'mtn','bank_transfer',amount(b,`received.*?ZMW\\s*(${NUMBER})`),balance,ref,null,'in');
+ if(/Payment.*?AIRTEL NFS/i.test(b))return result(m,'mtn','bank_transfer',amount(b,`Payment.*?ZMW\\s*(${NUMBER})`),balance,ref,null,'out');
+ if(/You have received ZMW.+on your mobile money account at/i.test(b))return result(m,'mtn','received',amount(b,`received ZMW\\s*(${NUMBER})`),balance,ref,null,'in');
+ if(/You have withdrawn.+(?:ZMW|from your mobile money account)/i.test(b))return result(m,'mtn','withdrawal',amount(b,`withdrawn\\s*(?:ZMW\\s*)?(${NUMBER})\\s*(?:ZMW)?`),balance,ref,null,'out');
  if(!/received|withdrawn|payment|balance|transaction|loan|airtime|data|bundle|purchase|sent/i.test(b))return null;
  return result(m,'mtn','unknown',null,balance,ref);
 }

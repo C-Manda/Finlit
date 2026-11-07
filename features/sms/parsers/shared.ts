@@ -1,4 +1,4 @@
-import type { ParsedSms, Provider, SmsKind, SmsMessage } from '../types';
+import type { ParsedSms, Provider, SmsDirection, SmsKind, SmsMessage } from '../types';
 export const NUMBER = '(?:[0-9][0-9,]*(?:\\.[0-9]+)?|\\.[0-9]+)';
 export function minorUnits(raw:string):number|null {
  if(!/^(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?|\.\d{1,2})$/.test(raw))return null;
@@ -19,7 +19,7 @@ export function timestamp(body:string):string|null {
  if(!Number.isFinite(d.getTime())||new Date(d.getTime()+7200000).toISOString().slice(0,19)!==wall)return null;
  return d.toISOString();
 }
-export function result(message:SmsMessage,provider:Provider,kind:SmsKind,amountMinor:number|null,balanceMinor:number|null,reference:string|null,feeMinor:number|null=null):ParsedSms {
+export function result(message:SmsMessage,provider:Provider,kind:SmsKind,amountMinor:number|null,balanceMinor:number|null,reference:string|null,feeMinor:number|null=null,direction:SmsDirection='unknown'):ParsedSms {
  const reported=timestamp(message.body), warnings:string[]=[];
  if(!new RegExp(provider,'i').test(message.sender))warnings.push('Sender is not a recognised provider label. Verify this message independently.');
  if(feeMinor===null)warnings.push('Fee was not stated. Confirm the actual fee, including zero, before posting.');
@@ -27,5 +27,5 @@ export function result(message:SmsMessage,provider:Provider,kind:SmsKind,amountM
  if(!reported)warnings.push('Using SMS receipt time; a delayed message may need a corrected transaction time.');
  if(kind==='unknown')warnings.push('Message format is not supported. Keep this candidate for review; it cannot be imported automatically.');
  if(amountMinor===null&&kind!=='balance_check'&&kind!=='failed')warnings.push('No reliable transaction amount; do not post this message.');
- return {provider,kind,amountMinor,feeMinor,balanceMinor,reference,occurredAt:reported??message.receivedAt,receivedAt:message.receivedAt,timestampSource:reported?'provider':'receipt',parserVersion:'finlit-sms-1',status:kind==='failed'?'failed':kind==='balance_check'?'balance_only':'requires_review',warnings};
+ return {provider,kind,amountMinor,feeMinor,balanceMinor,reference,direction,occurredAt:reported??message.receivedAt,receivedAt:message.receivedAt,timestampSource:reported?'provider':'receipt',parserVersion:'finlit-sms-1',status:kind==='failed'?'failed':kind==='balance_check'?'balance_only':'requires_review',warnings};
 }
