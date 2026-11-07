@@ -1,6 +1,6 @@
 import type { SmsMessage } from './types';
 export type SmsSettings = {enabled:boolean;baseline:string|null;lastScan:string|null;full:boolean;cache:string|null};
-export type ScanResult = {visited:number;candidates:number;before:number;beforeId:string;more:boolean;full:boolean};
+export type ScanResult = {visited:number;relevant:number;newlyQueued:number;previouslyHandled:number;unsupported:number;pending:number;before:number;beforeId:string;more:boolean;full:boolean};
 export type SmsDiagnostics = {
  nativeAvailable:boolean; readSms:boolean; receiveSms:boolean; trackingEnabled:boolean;
  ownerInitialized:boolean; lastReceiverEvent:string|null; lastScan:string|null;

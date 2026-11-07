@@ -13,6 +13,22 @@ const fixtures=[
 const message=(body,sender='MTN')=>({id:'fixture',body,sender,receivedAt:'2026-11-04T11:00:00.000Z',subscriptionId:null,fingerprint:'a'.repeat(64)});
 for(const [sender,body,provider,kind,amt,fee,bal,ref,time] of fixtures){const p=parseSms(message(body,sender));assert(p,body);assert.equal(p.provider,provider);assert.equal(p.kind,kind);assert.equal(p.amountMinor,amt);assert.equal(p.feeMinor,fee);assert.equal(p.balanceMinor,bal);assert.equal(p.reference,ref);assert.equal(p.occurredAt,time??message('').receivedAt);assert.equal(p.timestampSource,time?'provider':'receipt');assert.notEqual(p.status,'imported');}
 const variant=fixtures[3][1].replace('You have sent Money to','Money sent to').replace('K1,550','K1,550.50').replace('Txn. ID :','TID:').replace('Your available balance is','Your bal is');assert.equal(parseSms(message(variant,'Airtel')).amountMinor,155050);
+const additional=[
+ ['MTN','You have withdrawn ZMW 75.00 from your mobile money account. Your new balance: ZMW 125.00. Financial Transaction Id: 11000000002.','withdrawal',7500,12500,'11000000002'],
+ ['MTN','Payment of ZMW 2.00 to Mobile Money Data Bundle successful. Your new balance: ZMW 8.00. Financial Transaction ID: 12000000001.','data_purchase',200,800,'12000000001'],
+ ['MTN','Payment of ZMW 5.00 to Mobile Money successful, successfully purchased K5:6GB/5hrs. Your new balance: ZMW 3.00. Financial Transaction ID: 12000000002.','data_purchase',500,300,'12000000002'],
+ ['MTN','Payment of ZMW 10.00 to Mobile Money Airtime successful. Your new balance: ZMW 2.00. Financial Transaction ID: 12000000003.','airtime_purchase',1000,200,'12000000003'],
+ ['MTN','You have received ZMW 20.00 from Airtel NFS. Your new balance: ZMW 30.00. Financial Transaction ID: 13000000001.','bank_transfer',2000,3000,'13000000001'],
+ ['MTN','Payment of ZMW 20.00 to AIRTEL NFS. Your new balance: ZMW 10.00. Financial Transaction ID: 13000000002.','bank_transfer',2000,1000,'13000000002'],
+ ['MTN','You have been credited with a NaSova loan of ZMW 50.00 from JUMO. Your new balance: ZMW 60.00. Txn. Id: LN12345.','loan',5000,6000,'LN12345'],
+ ['Airtel','You have received ZMW 44.00 from SAMPLE PERSON. Your bal is ZMW 100.00. TID: PP261104.1100.H48969.','received',4400,10000,'PP261104.1100.H48969'],
+ ['Airtel','You have purchased a data bundle of ZMW 5.00. Airtel Money bal is ZMW 95.00. TID: MP261104.1101.H48970.','data_purchase',500,9500,'MP261104.1101.H48970'],
+ ['Airtel','You have purchased airtime of ZMW 3.00. Bal is ZMW 92.00. TID: CO261104.1102.H48971.','airtime_purchase',300,9200,'CO261104.1102.H48971'],
+ ['Airtel','Money received from MNOWALLET NFS SETTLEMENT ACCOUNT. Amount ZMW 25.00. Your available balance is ZMW 117.00. TID: PP261104.1103.H48972.','bank_transfer',2500,11700,'PP261104.1103.H48972'],
+];
+for(const [sender,body,kind,amt,bal,ref] of additional){const p=parseSms(message(body,sender));assert(p,body);assert.equal(p.kind,kind);assert.equal(p.amountMinor,amt);assert.equal(p.balanceMinor,bal);assert.equal(p.reference,ref);}
+assert.equal(parseSms(message('MTN data bundle special offer ZMW 5 promotion','MTN')),null);
+assert.equal(parseSms(message('Unrecognised mobile wallet payment of ZMW 9.00 for a subscription','Wallet')).kind,'unknown');
 assert.equal(parseSms(message(fixtures[0][1].replace('ZMW 50.00','ZMW 1,55.00'))).amountMinor,null);
 assert.equal(parseSms(message(fixtures[0][1].replace('ZMW 50.00','ZMW '))).amountMinor,null);
 assert.equal(parseSms(message(fixtures[0][1].replace(/Financial Transaction ID: \d+\./,''))).reference,null);

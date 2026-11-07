@@ -54,7 +54,7 @@ class FinlitSmsModule : Module() {
         "lastReceiverEvent" to prefs.getString("lastReceiver_$u",null),
         "lastScan" to prefs.getString("lastScan_$u",null),
         "messagesScanned" to prefs.getInt("scanned_$u",0),
-        "candidatesQueued" to prefs.getInt("queued_$u",0),
+        "candidatesQueued" to SmsQueue(context).use { it.pendingCount(u) },
         "pendingQueue" to SmsQueue(context).use { it.pendingCount(u) },
         "lastError" to prefs.getString("lastError_$u",null)
       )
@@ -67,13 +67,13 @@ class FinlitSmsModule : Module() {
     AsyncFunction("candidates") { expected:String -> SmsQueue(context).use {it.list(owner(expected))} }
     AsyncFunction("saveCandidate") { expected:String,id:String,value:String -> SmsQueue(context).use {it.save(owner(expected),id,value)} }
     AsyncFunction("acknowledge") { expected:String,id:String -> SmsQueue(context).use {it.acknowledge(owner(expected),id)} }
-    AsyncFunction("clearCandidates") { expected:String -> val u=owner(expected);SmsQueue(context).use {it.acknowledge(u,null)};prefs.edit().putBoolean("full_$u",false).commit();Unit }
+    AsyncFunction("clearCandidates") { expected:String -> val u=owner(expected);SmsQueue(context).use {it.clear(u)};prefs.edit().putBoolean("full_$u",false).commit();Unit }
     AsyncFunction("scan") { expected:String,since:Double,before:Double,beforeId:String? ->
       val u=owner(expected)
       try {
       require(granted()) {"SMS permission was denied or revoked. Open Android settings to grant it."};require(prefs.getBoolean("enabled_$u",false)) {"SMS tracking is disabled"}
       require(since.isFinite()&&before.isFinite()&&since>=0&&before>since)
-      var visited=0;var added=0;var lastDate=before.toLong();var lastId=beforeId?:Long.MAX_VALUE.toString();var full=false
+      var visited=0;var relevant=0;var added=0;var handled=0;var lastDate=before.toLong();var lastId=beforeId?:Long.MAX_VALUE.toString();var full=false
       val projection=arrayOf("_id","address","body","date","date_sent","sub_id")
       val selection="date>=? AND (date<? OR (date=? AND _id<?))"
       val args=arrayOf(since.toLong().toString(),before.toLong().toString(),before.toLong().toString(),beforeId?:Long.MAX_VALUE.toString())
@@ -97,17 +97,23 @@ class FinlitSmsModule : Module() {
             require(senderIndex>=0&&bodyIndex>=0) {"Android SMS provider omitted required columns."}
             val sender=c.getString(senderIndex)?:"";val body=c.getString(bodyIndex)?:""
             if(SmsQueue.candidate(sender,body)) {
+              relevant++
               val sentIndex=c.getColumnIndex("date_sent");val subIndex=c.getColumnIndex("sub_id")
               val sent=if(sentIndex>=0)c.getLong(sentIndex).takeIf {it>0}?:lastDate else lastDate
               val sub=if(subIndex<0||c.isNull(subIndex)||c.getString(subIndex)=="-1")null else c.getString(subIndex)
-              if(q.enqueue(u,sender,body,lastDate,sent,sub))added++ else full=true
+              when(q.enqueueResult(u,sender,body,lastDate,sent,sub)){
+                SmsQueue.EnqueueResult.NEW->added++
+                SmsQueue.EnqueueResult.ALREADY_PENDING, SmsQueue.EnqueueResult.ALREADY_HANDLED, SmsQueue.EnqueueResult.ALREADY_CLEARED->handled++
+                SmsQueue.EnqueueResult.FULL->full=true
+              }
             }
           }
         }
       }
       prefs.edit().putString("lastScan_$u",smsIsoTime()).putInt("scanned_$u",visited)
         .putInt("queued_$u",added).putString("lastError_$u",null).putBoolean("full_$u",full).commit()
-      mapOf("visited" to visited,"candidates" to added,"before" to lastDate.toDouble(),"beforeId" to lastId,"more" to (visited==250),"full" to full)
+      val pending=SmsQueue(context).use {it.pendingCount(u)}
+      mapOf("visited" to visited,"relevant" to relevant,"newlyQueued" to added,"previouslyHandled" to handled,"unsupported" to 0,"pending" to pending,"before" to lastDate.toDouble(),"beforeId" to lastId,"more" to (visited==250),"full" to full)
       } catch(error:Exception) {
         prefs.edit().putString("lastError_$u",error.message ?: "Inbox scan failed").commit()
         throw error

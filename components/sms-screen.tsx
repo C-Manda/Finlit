@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {AppState,Linking,Platform,Pressable,Text,View} from 'react-native';
 import {useFocusEffect,useRouter} from 'expo-router';
 import {useAuth} from '@/contexts/auth-context';
@@ -30,7 +30,7 @@ function SmsBody({owner}:{owner:string}){
  const s=useLearningStyles(),router=useRouter();
  const [settings,setSettings]=useState(initialSettings),[permission,setPermission]=useState(false),[diagnostics,setDiagnostics]=useState(initialDiagnostics),[data,setData]=useState<BudgetData|null>(null),[imports,setImports]=useState<SmsImport[]>([]);
  const [candidates,setCandidates]=useState<LocalCandidate[]>([]),[selected,setSelected]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
- const [days,setDays]=useState('7'),[cursor,setCursor]=useState<ScanResult|null>(null),[clear,setClear]=useState(false),[confirmEnable,setConfirmEnable]=useState(false);
+ const [days,setDays]=useState('7'),[cursor,setCursor]=useState<ScanResult|null>(null),[clear,setClear]=useState(false),[confirmEnable,setConfirmEnable]=useState(false),[showOlder,setShowOlder]=useState(false);
  const [manualBaseline,setManualBaseline]=useState(new Date().toISOString());
  const [manual,setManual]=useState(false),[body,setBody]=useState(''),[sender,setSender]=useState(''),[received,setReceived]=useState(new Date().toISOString());
  const alive=useRef(true),lock=useRef(false);
@@ -49,11 +49,17 @@ function SmsBody({owner}:{owner:string}){
  useEffect(()=>{const receive=()=>void refresh().catch(()=>undefined);const sub=smsNative?.addListener('onCandidate',receive);const foreground=AppState.addEventListener('change',state=>{if(state==='active')receive();});return()=>{sub?.remove();foreground.remove();};},[refresh]);
  async function run(work:()=>Promise<void>){if(lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('');try{await work();}catch(e){if(alive.current)setError(e instanceof Error?e.message:String(e));}finally{lock.current=false;if(alive.current)setBusy(false);}}
  const current=candidates.find(c=>c.message.id===selected);
+ const cutoff=Date.now()-Number(days)*86400000;
+ const recentCandidates=useMemo(()=>candidates.filter(c=>Date.parse(c.message.receivedAt)>=cutoff),[candidates,cutoff]);
+ const olderCount=candidates.length-recentCandidates.length;
  async function scan(more=false){
   if(!smsNative)return;
   const n=Number(days);if(!Number.isInteger(n)||n<1||n>90)throw new Error('Choose 1–90 recent days.');
-  const result=await smsNative.scan(owner,Date.now()-n*86400000,more&&cursor?cursor.before:Date.now()+1000,more&&cursor?cursor.beforeId:null);
-  if(alive.current){setCursor(result);setNotice(`Checked ${result.visited} messages; ${result.candidates} candidates. ${result.more?'More messages are available.':''}`);}await refresh();
+  const scanSince=Date.now()-n*86400000;
+  const result=await smsNative.scan(owner,scanSince,more&&cursor?cursor.before:Date.now()+1000,more&&cursor?cursor.beforeId:null);
+  await refresh();
+  const unsupported=(await localCandidates(owner)).filter(c=>c.parsed.kind==='unknown'&&Date.parse(c.message.receivedAt)>=scanSince).length;
+  if(alive.current){setCursor(result);setNotice(`Checked ${result.visited} messages; ${result.relevant} relevant; ${result.newlyQueued} newly queued; ${result.previouslyHandled} previously handled; ${unsupported} unsupported awaiting review; ${result.pending} pending. ${result.more?'More messages are available.':''}`);}
  }
  async function parseManual(){
   const fingerprint=await manualFingerprint(sender,body,received),message={id:fingerprint,fingerprint,sender,body,receivedAt:received,subscriptionId:null};
@@ -83,7 +89,7 @@ function SmsBody({owner}:{owner:string}){
    <Text style={s.note}>Tracking baseline: {settings.baseline?dateTime(settings.baseline):'Not set'} · Last scan: {settings.lastScan?dateTime(settings.lastScan):'Never'}</Text>
    <Text style={s.note}>Diagnostics: native {diagnostics.nativeAvailable?'available':'unavailable'} · READ_SMS {diagnostics.readSms?'granted':'missing'} · RECEIVE_SMS {diagnostics.receiveSms?'granted':'missing'} · owner {diagnostics.ownerInitialized?'ready':'not initialized'} · receiver {diagnostics.lastReceiverEvent?dateTime(diagnostics.lastReceiverEvent):'never'} · scanned {diagnostics.messagesScanned} · queued {diagnostics.candidatesQueued} · pending {diagnostics.pendingQueue}</Text>
    {!!diagnostics.lastError&&<Text accessibilityRole="alert" style={s.body}>Last native capture/scan error: {diagnostics.lastError}</Text>}
-   <Field label="Scan recent days (1–90)" value={days} onChangeText={v=>{setDays(v);setCursor(null);}} keyboardType="number-pad" editable={!busy}/>
+   <Field label="Scan recent days (1–90)" value={days} onChangeText={v=>{setDays(v);setCursor(null);setShowOlder(false);}} keyboardType="number-pad" editable={!busy}/>
    <LearningButton title="Scan existing SMS" disabled={busy||!settings.enabled||!permission} onPress={()=>void run(()=>scan())}/>
    {cursor?.more&&<LearningButton title="Scan next page" secondary disabled={busy||!settings.enabled||!permission} onPress={()=>void run(()=>scan(true))}/>}
    {settings.full&&<Text accessibilityRole="alert" style={s.body}>The local queue is full. Review or clear candidates, then scan again. Pending confirmations have not been discarded.</Text>}
@@ -92,8 +98,9 @@ function SmsBody({owner}:{owner:string}){
   {manual&&<View style={s.card}><Field label="Confirmed tracking baseline (ISO with timezone)" value={manualBaseline} onChangeText={setManualBaseline}/><Text style={s.note}>Use the time your starting balance was confirmed. Earlier messages stay history-only.</Text><Field label="SMS sender" value={sender} onChangeText={setSender}/><Field label="SMS receipt timestamp (ISO with timezone)" value={received} onChangeText={setReceived}/><Field label="SMS text (never paste a PIN or OTP)" value={body} onChangeText={setBody} multiline maxLength={4096}/><LearningButton title="Parse SMS locally" disabled={busy} onPress={()=>void run(parseManual)}/></View>}
   {!!error&&<Text accessibilityRole="alert" style={s.body}>{error}</Text>}{!!notice&&<Text accessibilityLiveRegion="polite" style={s.body}>{notice}</Text>}
   <LearningButton title={busy?'Working…':'Refresh and retry approved imports'} secondary disabled={busy} onPress={()=>void run(refresh)}/>
-  <Text style={s.heading}>Pending review · {candidates.length}</Text>
-  {current&&data?<SmsReview key={current.message.id} candidate={current} data={data} imports={imports} busy={busy} baseline={settings.baseline??manualBaseline} onClose={()=>setSelected(null)} onConfirm={approval=>run(()=>confirm(current,approval))}/>:candidates.map(c=><View key={c.message.id} style={s.card}><Text style={s.heading}>{providerName(c.parsed.provider)} · {c.parsed.kind.replace(/_/g,' ')}</Text><Text style={s.body}>{amount(c.parsed.amountMinor)} · {dateTime(c.parsed.occurredAt)}</Text><Text style={s.note}>{c.approval?'Confirmed locally · awaiting database':'Needs your review'}</Text>{!!c.error&&<Text style={s.body}>{c.error}</Text>}<LearningButton title="Review message" secondary disabled={busy} onPress={()=>setSelected(c.message.id)}/></View>)}
+  <Text style={s.heading}>Pending review · {recentCandidates.length}</Text>
+  {olderCount>0&&<><Text style={s.note}>{olderCount} older candidate{olderCount===1?'':'s'} retained locally.</Text><LearningButton title={showOlder?'Hide older candidates':'View older candidates'} secondary onPress={()=>setShowOlder(!showOlder)}/></>}
+  {current&&data?<SmsReview key={current.message.id} candidate={current} data={data} imports={imports} busy={busy} baseline={settings.baseline??manualBaseline} onClose={()=>setSelected(null)} onConfirm={approval=>run(()=>confirm(current,approval))}/>: (showOlder?candidates:recentCandidates).map(c=><View key={c.message.id} style={s.card}><Text style={s.heading}>{providerName(c.parsed.provider)} · {c.parsed.kind.replace(/_/g,' ')}</Text><Text style={s.body}>{amount(c.parsed.amountMinor)} · {dateTime(c.parsed.occurredAt)}</Text><Text style={s.note}>{c.parsed.kind==='unknown'?'Unsupported format · manual review only':c.approval?'Confirmed locally · awaiting database':'Needs your review'}</Text>{!!c.error&&<Text style={s.body}>{c.error}</Text>}<LearningButton title="Review message" secondary disabled={busy} onPress={()=>setSelected(c.message.id)}/></View>)}
   {!data&&<Text style={s.note}>Connect once to load your wallets and categories before confirming imports.</Text>}
   {smsNative&&<><LearningButton title="Clear local SMS candidates" secondary disabled={busy} onPress={()=>setClear(true)}/>{clear&&<View style={s.card}><Text style={s.body}>Remove locally retained message text and pending confirmations? Already imported financial entries remain. Duplicate fingerprints are retained locally.</Text><LearningButton title="Confirm clear candidates" disabled={busy} onPress={()=>void run(async()=>{await smsNative!.clearCandidates(owner);setCandidates([]);setSelected(null);setClear(false);await refresh();})}/><LearningButton title="Keep candidates" secondary onPress={()=>setClear(false)}/></View>}</>}
   {data&&(data.locations??[]).filter(l=>l.active&&l.location_type==='mobile_money').map(l=>{
@@ -109,7 +116,7 @@ function SmsReview({candidate,data,imports,busy,baseline,onClose,onConfirm}:{can
  const s=useLearningStyles(),palette=usePalette(),p=candidate.parsed;
  const wallets=suggestedWallets(p,data.locations??[]),old=candidate.approval;
  const [wallet,setWallet]=useState(String(old?.wallet??(wallets.length===1?wallets[0].id:'')));
- const [type,setType]=useState(String(old?.type??(p.kind==='withdrawal'?'transfer':p.kind==='received'?'income':'expense')));
+ const [type,setType]=useState(String(old?.type??(p.kind==='withdrawal'||p.kind==='bank_transfer'?'transfer':p.kind==='received'?'income':'expense')));
  const [direction,setDirection]=useState(p.kind==='received'?'in':'out');
  const [other,setOther]=useState(String(old?.destination??(p.kind==='withdrawal'?(data.locations??[]).find(l=>l.location_type==='cash')?.id??'':'')));
  const [category,setCategory]=useState(String(old?.category??'')),[fee,setFee]=useState(old?.feeMinor!==undefined?String(Number(old.feeMinor)/100):p.feeMinor===null?'':String(p.feeMinor/100));
@@ -117,7 +124,7 @@ function SmsReview({candidate,data,imports,busy,baseline,onClose,onConfirm}:{can
  const selected=(data.locations??[]).find(l=>l.id===wallet),sameDay=selected?.opening_date===localDate(new Date(p.occurredAt));
  const historical=Date.parse(p.occurredAt)<Date.parse(baseline)||(selected&&localDate(new Date(p.occurredAt))<selected.opening_date);
  const matches=possibleMatches(p,wallet,data.entries).filter(e=>!imports.some(i=>i.financial_entry_id===e.id));
- const cannotPost=p.amountMinor===null||['balance_check','failed','loan','refund','reversal'].includes(p.kind);
+ const cannotPost=p.amountMinor===null||['balance_check','failed','loan','refund','reversal','unknown'].includes(p.kind);
  const decide=(decision:string)=>{
   if(!wallet){setError('Choose and confirm the wallet for this message.');return;}
   const feeMinor=minorUnits(fee);
