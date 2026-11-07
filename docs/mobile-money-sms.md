@@ -43,27 +43,53 @@ No new security advisory was introduced. Existing findings remain: [intentionall
 
 ## APK build and verification
 
-Native Android project generation and Expo autolinking succeeded, including `expo.modules.finlitsms.FinlitSmsModule`. Android JS/Hermes export succeeded. These checks do not compile Kotlin or produce an APK.
+The Expo project is linked to the existing `vestin/finlit-mobile` EAS project
+(`1226801c-4de4-40a4-a88e-712bdb2b46ff`). The `preview` profile uses internal
+distribution and `android.buildType: "apk"`. EAS preview environment variables
+contain `EXPO_PUBLIC_SUPABASE_URL` and
+`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; no service-role key is configured for
+the client build.
 
-Actual local `./gradlew assembleRelease --no-daemon --max-workers=2` attempt failed immediately: `JAVA_HOME is not set and no 'java' command could be found in your PATH`. No JDK/Android SDK or existing EAS project is installed. A toolchain download was attempted but stopped because throughput made completion impractical. **No APK was produced and no phone tests were performed.**
+The cloud build completed successfully on 2026-11-05:
 
-After installing JDK 17 and the Android SDK required by Expo SDK 54, set `JAVA_HOME` and `ANDROID_HOME`, install platform/build tools and accept Android SDK licences. From the app directory:
+- Build: [EAS build 9975b93e-da2d-41f6-befd-0bbb4e1f4b73](https://expo.dev/accounts/vestin/projects/finlit-mobile/builds/9975b93e-da2d-41f6-befd-0bbb4e1f4b73)
+- APK: [download the signed internal APK](https://expo.dev/artifacts/eas/-ytvZdxEFeUPfr8cYMlVr4Fmsj4fjiVPXOIrehZUjKQ.apk)
+- Package: `com.finlit.mobile`, version `1.0.0` / Android build `1`
+- Credentials: EAS remote Android credentials (`Build Credentials Q9PxqpQ2WU`)
 
-```sh
-npx expo prebuild --platform android --no-install
-cd android
-./gradlew assembleRelease --no-daemon --max-workers=2
-```
+The downloaded artifact was identified as an Android package, passed ZIP
+integrity validation, and was confirmed to be an APK rather than an AAB. Its
+DEX files contain `expo.modules.finlitsms.FinlitSmsModule` and
+`expo.modules.finlitsms.SmsReceiver`, confirming that the Kotlin module was
+compiled into the application. The binary merged manifest contains
+`android.permission.READ_SMS`, `android.permission.RECEIVE_SMS`, and the
+`android.provider.Telephony.SMS_RECEIVED` receiver. The receiver is exported
+and protected by `android.permission.BROADCAST_SMS`. No `SEND_SMS` permission
+or unrelated storage/biometric permission is present. The APK was signed by
+EAS using the configured remote Android credentials; no local Android SDK
+signing-inspection tool was available for an independent certificate dump.
 
-Expected artifact after a successful build: `android/app/build/outputs/apk/release/app-release.apk`. Inspect signing and merged permissions before distributing it; the local generated release configuration uses the development signing key. For an internal EAS APK, sign in, link/create the EAS project, then run `npx eas-cli build --platform android --profile preview`. The existing `preview` profile selects APK output. No cloud build was started.
+No Kotlin or Gradle compilation errors occurred. The local JDK/Android SDK
+remain unnecessary because compilation was performed by EAS. No phone was available in this environment, so installation and
+physical-device behavior remain pending.
 
 Android API references: [SMS broadcast handling](https://developer.android.com/reference/android/provider/Telephony.Sms.Intents), [bounded query arguments](https://developer.android.com/reference/android/content/ContentResolver#QUERY_ARG_LIMIT), [Expo native modules](https://docs.expo.dev/modules/module-api/).
 
 ## Automated and physical checks
 
-Passed: supplied SMS parser fixtures/variants; exact money and unknown fees; database imports/matches/transfers, rollback, opening boundaries, duplicate retries and RLS; offline approval retention, retry serialization, disabled/revoked/account-switched behavior and reconciliation ordering; existing learning, auth, debug, system/database, budget, budget UX, Money Locations, knowledge and academic-polish suites. TypeScript, ESLint (zero warnings) and `git diff --check` pass. Web/static and Android/Hermes exports pass. The complete real-component browser/SQL suite passes, including an MTN review with verified zero fee and opening-day confirmation: available money increases by K50, exactly one ledger entry is added, status becomes imported and raw text disappears. Existing 390/320px and light/dark regressions pass without runtime exceptions. The lesson browser suite also passes. SMS screenshots were inspected at `.expo/system-review/screens/sms-{review,imported}.png`. Initial test runs caught an unsupported test fixture and a checkbox accessibility-label omission; both were corrected before the passing full run.
+Passed: supplied SMS parser fixtures/variants; exact money and unknown fees;
+SMS database imports/matches/transfers, rollback, opening boundaries, duplicate
+retries and RLS; offline approval retention, retry serialization,
+disabled/revoked/account-switched behavior and reconciliation ordering; and
+Money Locations regression coverage. TypeScript, ESLint (zero warnings),
+Expo configuration validation, Android prebuild/autolinking, and
+`git diff --check` pass. The database and Money Locations scripts initially
+failed because `@electric-sql/pglite` was used by the tests but missing from
+`devDependencies`; it was added without changing runtime dependencies, then
+both suites passed. Physical-device testing remains pending.
 
-Physical-device checklist — all pending until an APK can be compiled and installed:
+Physical-device checklist — APK compilation and artifact inspection are complete;
+the following acceptance steps require a physical Android device:
 
 - Install and launch; deny, grant and revoke permissions; disable/re-enable tracking.
 - Scan real MTN/Airtel/Zamtel inbox examples; repeat scans; confirm unknown templates remain review-only; exclude personal messages/OTPs.
