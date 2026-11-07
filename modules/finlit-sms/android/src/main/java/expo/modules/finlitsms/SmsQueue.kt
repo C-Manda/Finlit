@@ -19,7 +19,10 @@ class SmsQueue(context: Context) : SQLiteOpenHelper(context, "finlit_sms.db", nu
     db.execSQL("CREATE TABLE candidates(owner TEXT NOT NULL,id TEXT NOT NULL,sender TEXT NOT NULL,body TEXT NOT NULL,received INTEGER NOT NULL,subscription TEXT,payload TEXT,done INTEGER NOT NULL DEFAULT 0,state TEXT NOT NULL DEFAULT 'pending',PRIMARY KEY(owner,id))")
   }
   override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-    if(oldVersion<2)db.execSQL("ALTER TABLE candidates ADD COLUMN state TEXT NOT NULL DEFAULT 'handled'")
+    if(oldVersion<2) {
+      db.execSQL("ALTER TABLE candidates ADD COLUMN state TEXT NOT NULL DEFAULT 'handled'")
+      db.execSQL("UPDATE candidates SET state=CASE WHEN done=0 THEN 'pending' ELSE 'handled' END")
+    }
   }
   enum class EnqueueResult { NEW, ALREADY_PENDING, ALREADY_HANDLED, ALREADY_CLEARED, FULL }
   fun enqueueResult(owner: String, sender: String, body: String, received: Long, sent: Long, subscription: String?): EnqueueResult {

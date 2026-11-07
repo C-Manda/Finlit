@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { Appearance, Platform, StyleSheet } from "react-native";
+import * as SecureStore from "expo-secure-store";
 
 export const palette = {
   ink: "#090b0c",
@@ -19,6 +20,42 @@ export const palette = {
 };
 
 export type Palette = typeof palette;
+export type ThemePreference = "system" | "light" | "dark";
+let preference: ThemePreference = "system";
+let loaded = false;
+const listeners = new Set<() => void>();
+const notify = () => listeners.forEach(listener => listener());
+const readStoredPreference = async () => {
+  try {
+    const value = Platform.OS === "web"
+      ? (typeof window !== "undefined" ? window.localStorage.getItem("finlit-theme") : null)
+      : await SecureStore.getItemAsync("finlit-theme");
+    if (value === "system" || value === "light" || value === "dark") preference = value;
+  } catch {
+    // The system palette remains a safe fallback when local storage is unavailable.
+  } finally {
+    loaded = true;
+    notify();
+  }
+};
+export async function setThemePreference(value: ThemePreference) {
+  preference = value;
+  try {
+    if (Platform.OS === "web") {
+      window.localStorage.setItem("finlit-theme", value);
+    } else {
+      await SecureStore.setItemAsync("finlit-theme", value);
+    }
+  } finally {
+    loaded = true;
+    notify();
+  }
+}
+const subscribeToTheme = (notifyTheme: () => void) => {
+  listeners.add(notifyTheme);
+  if (!loaded) void readStoredPreference();
+  return () => listeners.delete(notifyTheme);
+};
 const darkPalette: Palette = {
   ink: "#f6f4f5",
   muted: "#c8bfc2",
@@ -40,7 +77,12 @@ const subscribeToAppearance = (notify: () => void) => {
   return () => subscription.remove();
 };
 export function useFinlitColorScheme() {
-  return useSyncExternalStore(subscribeToAppearance, Appearance.getColorScheme, () => 'light');
+  const system = useSyncExternalStore(subscribeToAppearance, Appearance.getColorScheme, () => 'light');
+  const selected = useSyncExternalStore(subscribeToTheme, () => preference, () => "system");
+  return selected === "system" ? system : selected;
+}
+export function useThemePreference(): ThemePreference {
+  return useSyncExternalStore(subscribeToTheme, () => preference, () => "system");
 }
 export function usePalette(): Palette {
   return useFinlitColorScheme() === "dark" ? darkPalette : palette;

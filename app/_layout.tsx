@@ -1,5 +1,5 @@
 import { SmsLifecycle } from '@/components/sms-lifecycle';
-import { usePalette } from '@/constants/finlit-theme';
+import { usePalette, useThemePreference } from '@/constants/finlit-theme';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
@@ -9,13 +9,14 @@ import { AuthProvider } from '@/contexts/auth-context';
 
 export default function RootLayout() {
   const palette = usePalette();
+  const theme = useThemePreference();
   return (
     <AuthProvider>
       <SmsLifecycle />
       <AuthGate>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.canvas } }} />
       </AuthGate>
-      <StatusBar style="auto" />
+      <StatusBar style={theme === "dark" ? "light" : theme === "light" ? "dark" : "auto"} />
     </AuthProvider>
   );
 }

@@ -6,6 +6,9 @@ import {
   radii,
   spacing,
   usePalette,
+  setThemePreference,
+  useThemePreference,
+  type ThemePreference,
   useCommonStyles,
   themedStyles,
 } from "@/constants/finlit-theme";
@@ -76,6 +79,7 @@ export function ProfileView() {
   const { profile, isLoading, error } = useProfile();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState("");
+  const theme = useThemePreference();
   const initials = (profile?.full_name ?? user?.email ?? "U")
     .slice(0, 2)
     .toUpperCase();
@@ -128,6 +132,23 @@ export function ProfileView() {
           </View>
           <Ionicons name="chevron-forward" size={17} color={palette.muted} />
         </Pressable>
+        <View style={styles.appearance}>
+          <Text style={styles.moduleTitle}>Appearance</Text>
+          <Text style={commonStyles.label}>Choose how FinLit looks on this device</Text>
+          <View style={styles.appearanceOptions}>
+            {(["system", "light", "dark"] as ThemePreference[]).map(option => (
+              <Pressable
+                key={option}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: theme === option }}
+                onPress={() => { void setThemePreference(option); }}
+                style={[styles.appearanceOption, theme === option && styles.appearanceSelected]}
+              >
+                <Text style={styles.appearanceText}>{option[0].toUpperCase() + option.slice(1)}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
         <Pressable
           accessibilityRole="button"
           style={styles.savedItem}
@@ -166,6 +187,11 @@ const useStyles = themedStyles((palette) => ({
     marginTop: spacing.sm,
   },
   moduleTitle: { color: palette.ink, fontSize: 13, fontWeight: "500" },
+  appearance: { marginTop: spacing.lg, gap: spacing.xs },
+  appearanceOptions: { flexDirection: "row", gap: spacing.xs, flexWrap: "wrap" },
+  appearanceOption: { borderWidth: 1, borderColor: palette.line, borderRadius: radii.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  appearanceSelected: { backgroundColor: palette.lilac, borderColor: palette.purple },
+  appearanceText: { color: palette.ink, fontSize: 13 },
   welcome: {
     minHeight: 590,
     backgroundColor: palette.blush,
