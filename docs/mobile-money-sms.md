@@ -13,11 +13,19 @@ SMS is a reviewed input to the existing Money Locations ledger. Opening balances
 - `supabase/migrations/20261104174205_sms_imports.sql`, `types/database.types.ts`: additive schema/RPC integration and regenerated remote types.
 - `scripts/test-sms-{parsers,database,queue}.cjs`, `scripts/test-system-ui.cjs`: new unit/accounting/queue tests and real-component SMS review coverage.
 
-## Native capture and privacy
+## Native capture architecture and privacy
 
-The Android manifest requests only `READ_SMS` and `RECEIVE_SMS` for SMS functionality, never `SEND_SMS`. The exported receiver requires the system `BROADCAST_SMS` permission. It joins multipart PDUs, filters unrelated/OTP/PIN/promotion text before persistence, and queues candidates without networking or a running JS process. Delivery while closed depends on Android/OEM restrictions; force-stop may prevent broadcasts until reopening. Native code has not yet been compiled or device-tested in this environment.
+The custom Expo module is registered as `expo.modules.finlitsms.FinlitSmsModule`. Its manifest receiver is the fully qualified `expo.modules.finlitsms.SmsReceiver`, exported for the Android SMS broadcast but protected by `android.permission.BROADCAST_SMS`. The manifest declares `READ_SMS` and `RECEIVE_SMS`; both are checked independently at runtime and both must be granted before tracking can start. The receiver reconstructs multipart PDUs, partitions its SQLite queue by authenticated owner, and performs no network work. The queue is app-private and raw bodies never leave the device.
+
+The tracking screen exposes native availability, each permission, owner initialization, tracking state, receiver/scan times, scan and queue counts, and the last non-sensitive native error. A receiver or inbox failure is retained in diagnostics and can be recovered by reopening tracking or running an inbox scan; it is not represented as a successful scan. Android provider columns such as `date_sent` and `sub_id` are optional and fall back safely when unavailable.
+
+Delivery while closed depends on Android/OEM restrictions; force-stop may prevent broadcasts until reopening. A successful APK build or mocked parser test does not verify physical SMS reception. Physical verification must use a signed custom APK, two real test messages, and the diagnostics panel.
 
 Inbox scans read at most 250 rows per user action using a date/ID cursor and a 1–90 day UI window. The provider is asked for a limit; an independent cursor cap also applies when it ignores that hint. Subscription ID is retained as a hint, never proof of wallet ownership. Account switching isolates local queues; disabling or revoking permission prevents processing. Disabling does not itself revoke OS permissions. The settings button opens Android's controls.
+
+Irrelevant personal, OTP/PIN and promotional messages are excluded. Recognised MTN, Airtel and Zamtel messages with unsupported formats remain unknown review candidates, and financial-looking messages with an unrecognised sender remain reviewable when their provider cannot be safely inferred. Unknown candidates are never automatically staged or imported.
+
+Money Locations and balances remain authoritative Supabase records scoped to the signed-in user. Local data is a cache/queue only; it cannot create a wallet or replace a wallet ID. Provider-to-wallet selection is confirmed per import, so a SIM subscription ID is only a hint. Sign-out stops capture and processing, and a pending local candidate does not automatically migrate to another phone. After signing in on a new device, the user must fetch their Supabase locations and review any SMS on that device.
 
 App-private SQLite holds up to 1,000 pending messages per account, including offline confirmations. Up to 5,000 completed fingerprints are retained locally. Acknowledge/clear wipes text and review payloads, retaining deduplication fingerprints. Raw SMS body, sender and SIM details are excluded from API payloads. Android app backup is disabled. The owner-specific cached budget snapshot allows offline review after one successful load. Sign-out suspends capture and processing; clearing candidates is explicit.
 
@@ -56,6 +64,13 @@ The cloud build completed successfully on 2026-11-05:
 - APK: [download the signed internal APK](https://expo.dev/artifacts/eas/-ytvZdxEFeUPfr8cYMlVr4Fmsj4fjiVPXOIrehZUjKQ.apk)
 - Package: `com.finlit.mobile`, version `1.0.0` / Android build `1`
 - Credentials: EAS remote Android credentials (`Build Credentials Q9PxqpQ2WU`)
+
+Fresh preview build for the diagnostics and parser repair completed successfully
+on 2026-11-07:
+
+- Build: [EAS build e2795606-5993-41d0-b718-210afa9e2e57](https://expo.dev/accounts/vestin/projects/finlit-mobile/builds/e2795606-5993-41d0-b718-210afa9e2e57)
+- Install page / APK artifact: use the build page above
+- This confirms cloud Gradle compilation and packaging, not physical SMS reception.
 
 The downloaded artifact was identified as an Android package, passed ZIP
 integrity validation, and was confirmed to be an APK rather than an AAB. Its

@@ -25,7 +25,7 @@ export function result(message:SmsMessage,provider:Provider,kind:SmsKind,amountM
  if(feeMinor===null)warnings.push('Fee was not stated. Confirm the actual fee, including zero, before posting.');
  if(!reference)warnings.push('No provider reference. Check existing records carefully.');
  if(!reported)warnings.push('Using SMS receipt time; a delayed message may need a corrected transaction time.');
- if(kind==='unknown')warnings.push('Purpose is not known. Choose the accounting treatment yourself.');
+ if(kind==='unknown')warnings.push('Message format is not supported. Keep this candidate for review; it cannot be imported automatically.');
  if(amountMinor===null&&kind!=='balance_check'&&kind!=='failed')warnings.push('No reliable transaction amount; do not post this message.');
  return {provider,kind,amountMinor,feeMinor,balanceMinor,reference,occurredAt:reported??message.receivedAt,receivedAt:message.receivedAt,timestampSource:reported?'provider':'receipt',parserVersion:'finlit-sms-1',status:kind==='failed'?'failed':kind==='balance_check'?'balance_only':'requires_review',warnings};
 }

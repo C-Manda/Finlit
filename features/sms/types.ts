@@ -1,4 +1,4 @@
-export type Provider = 'mtn' | 'airtel' | 'zamtel';
+export type Provider = 'mtn' | 'airtel' | 'zamtel' | 'unknown';
 export type SmsKind = 'received' | 'sent' | 'withdrawal' | 'deposit' | 'merchant_payment' | 'bill_payment' | 'airtime_purchase' | 'data_purchase' | 'bank_transfer' | 'reversal' | 'refund' | 'loan' | 'balance_check' | 'failed' | 'unknown';
 export type SmsMessage = { id: string; sender: string; body: string; receivedAt: string; subscriptionId: string | null; fingerprint: string };
 export type ParsedSms = {

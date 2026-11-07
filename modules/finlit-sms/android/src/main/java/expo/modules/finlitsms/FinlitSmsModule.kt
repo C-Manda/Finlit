@@ -30,11 +30,34 @@ class FinlitSmsModule : Module() {
     }
     OnDestroy { try { context.unregisterReceiver(listener) } catch(_:IllegalArgumentException) {} }
     AsyncFunction("setOwner") { value:String? -> prefs.edit().apply {if(value==null)remove("owner")else putString("owner",value)}.commit();Unit }
-    AsyncFunction("permissionStatus") { promise:Promise -> Permissions.getPermissionsWithPermissionsManager(appContext.permissions,promise,Manifest.permission.READ_SMS,Manifest.permission.RECEIVE_SMS) }
+    AsyncFunction("permissionStatus") { promise:Promise ->
+      promise.resolve(mapOf(
+        "granted" to granted(),
+        "canAskAgain" to true,
+        "readSms" to (context.checkSelfPermission(Manifest.permission.READ_SMS)==PackageManager.PERMISSION_GRANTED),
+        "receiveSms" to (context.checkSelfPermission(Manifest.permission.RECEIVE_SMS)==PackageManager.PERMISSION_GRANTED)
+      ))
+    }
     AsyncFunction("requestPermissions") { promise:Promise -> Permissions.askForPermissionsWithPermissionsManager(appContext.permissions,promise,Manifest.permission.READ_SMS,Manifest.permission.RECEIVE_SMS) }
     AsyncFunction("settings") { expected:String ->
       val u=owner(expected)
       mapOf("enabled" to prefs.getBoolean("enabled_$u",false),"baseline" to prefs.getString("baseline_$u",null),"lastScan" to prefs.getString("lastScan_$u",null),"full" to prefs.getBoolean("full_$u",false),"cache" to prefs.getString("cache_$u",null))
+    }
+    AsyncFunction("diagnostics") { expected:String ->
+      val u=owner(expected)
+      val read=context.checkSelfPermission(Manifest.permission.READ_SMS)==PackageManager.PERMISSION_GRANTED
+      val receive=context.checkSelfPermission(Manifest.permission.RECEIVE_SMS)==PackageManager.PERMISSION_GRANTED
+      mapOf(
+        "nativeAvailable" to true, "readSms" to read, "receiveSms" to receive,
+        "trackingEnabled" to prefs.getBoolean("enabled_$u",false),
+        "ownerInitialized" to (prefs.getString("owner",null)==u),
+        "lastReceiverEvent" to prefs.getString("lastReceiver_$u",null),
+        "lastScan" to prefs.getString("lastScan_$u",null),
+        "messagesScanned" to prefs.getInt("scanned_$u",0),
+        "candidatesQueued" to prefs.getInt("queued_$u",0),
+        "pendingQueue" to SmsQueue(context).use { it.pendingCount(u) },
+        "lastError" to prefs.getString("lastError_$u",null)
+      )
     }
     AsyncFunction("setEnabled") { expected:String, enabled:Boolean ->
       val u=owner(expected);require(!enabled||granted()) {"SMS permissions are required"}
@@ -46,7 +69,9 @@ class FinlitSmsModule : Module() {
     AsyncFunction("acknowledge") { expected:String,id:String -> SmsQueue(context).use {it.acknowledge(owner(expected),id)} }
     AsyncFunction("clearCandidates") { expected:String -> val u=owner(expected);SmsQueue(context).use {it.acknowledge(u,null)};prefs.edit().putBoolean("full_$u",false).commit();Unit }
     AsyncFunction("scan") { expected:String,since:Double,before:Double,beforeId:String? ->
-      val u=owner(expected);require(granted()) {"SMS permission was denied or revoked. Open Android settings to grant it."};require(prefs.getBoolean("enabled_$u",false)) {"SMS tracking is disabled"}
+      val u=owner(expected)
+      try {
+      require(granted()) {"SMS permission was denied or revoked. Open Android settings to grant it."};require(prefs.getBoolean("enabled_$u",false)) {"SMS tracking is disabled"}
       require(since.isFinite()&&before.isFinite()&&since>=0&&before>since)
       var visited=0;var added=0;var lastDate=before.toLong();var lastId=beforeId?:Long.MAX_VALUE.toString();var full=false
       val projection=arrayOf("_id","address","body","date","date_sent","sub_id")
@@ -67,17 +92,26 @@ class FinlitSmsModule : Module() {
         SmsQueue(context).use { q ->
           while(visited<250&&c.moveToNext()) {
             if(prefs.getString("owner",null)!=u||!prefs.getBoolean("enabled_$u",false)||!granted())break
-            visited++;lastId=c.getString(0);lastDate=c.getLong(3)
-            val sender=c.getString(1)?:"";val body=c.getString(2)?:""
+            visited++;lastId=c.getString(0);lastDate=c.getLong(c.getColumnIndexOrThrow("date"))
+            val senderIndex=c.getColumnIndex("address");val bodyIndex=c.getColumnIndex("body")
+            require(senderIndex>=0&&bodyIndex>=0) {"Android SMS provider omitted required columns."}
+            val sender=c.getString(senderIndex)?:"";val body=c.getString(bodyIndex)?:""
             if(SmsQueue.candidate(sender,body)) {
-              val sub=if(c.isNull(5)||c.getInt(5)<0)null else c.getString(5)
-              if(q.enqueue(u,sender,body,lastDate,c.getLong(4).takeIf {it>0}?:lastDate,sub))added++ else full=true
+              val sentIndex=c.getColumnIndex("date_sent");val subIndex=c.getColumnIndex("sub_id")
+              val sent=if(sentIndex>=0)c.getLong(sentIndex).takeIf {it>0}?:lastDate else lastDate
+              val sub=if(subIndex<0||c.isNull(subIndex)||c.getString(subIndex)=="-1")null else c.getString(subIndex)
+              if(q.enqueue(u,sender,body,lastDate,sent,sub))added++ else full=true
             }
           }
         }
       }
-      prefs.edit().putString("lastScan_$u",smsIsoTime()).putBoolean("full_$u",full).commit()
+      prefs.edit().putString("lastScan_$u",smsIsoTime()).putInt("scanned_$u",visited)
+        .putInt("queued_$u",added).putString("lastError_$u",null).putBoolean("full_$u",full).commit()
       mapOf("visited" to visited,"candidates" to added,"before" to lastDate.toDouble(),"beforeId" to lastId,"more" to (visited==250),"full" to full)
+      } catch(error:Exception) {
+        prefs.edit().putString("lastError_$u",error.message ?: "Inbox scan failed").commit()
+        throw error
+      }
     }
   }
 }

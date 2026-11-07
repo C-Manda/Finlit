@@ -4,7 +4,7 @@ alter table public.financial_entries add column occurred_at timestamptz;
 alter table public.financial_entries add constraint financial_entry_precise_date check(occurred_at is null or occurred_on=(occurred_at at time zone 'Africa/Lusaka')::date);
 create table public.sms_imports (
  id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
- location_id uuid not null, provider text not null check(provider in ('mtn','airtel','zamtel')),
+ location_id uuid not null, provider text not null check(provider in ('mtn','airtel','zamtel','unknown')),
  provider_transaction_id text check(length(provider_transaction_id) between 1 and 120),
  message_fingerprint text not null check(message_fingerprint ~ '^[a-f0-9]{64}$'),
  sms_received_at timestamptz not null, transaction_occurred_at timestamptz not null,
@@ -54,7 +54,7 @@ begin
   select * into l from public.money_locations where id=(p->>'wallet')::uuid and user_id=u and active and location_type='mobile_money';
   if l.id is null then raise exception 'Choose your active Mobile Money wallet' using errcode='42501'; end if;
   if p->>'walletConfirmed' is distinct from 'true' then raise exception 'Confirm which wallet received this SMS'; end if;
-  if coalesce(p->>'provider','') not in ('mtn','airtel','zamtel') or coalesce(p->>'kind','') not in ('received','sent','withdrawal','deposit','merchant_payment','bill_payment','airtime_purchase','data_purchase','bank_transfer','reversal','refund','loan','balance_check','failed','unknown')
+  if coalesce(p->>'provider','') not in ('mtn','airtel','zamtel','unknown') or coalesce(p->>'kind','') not in ('received','sent','withdrawal','deposit','merchant_payment','bill_payment','airtime_purchase','data_purchase','bank_transfer','reversal','refund','loan','balance_check','failed','unknown')
    or coalesce(p->>'fingerprint','') !~ '^[a-f0-9]{64}$' or coalesce(p->>'timestampSource','') not in ('provider','receipt')
    or coalesce(p->>'parserVersion','')<>'finlit-sms-1'
    or (nullif(p->>'reference','') is not null and (length(p->>'reference')>120 or (p->>'reference') !~ '^[A-Za-z0-9._-]+$')) then raise exception 'Invalid SMS candidate'; end if;
@@ -99,7 +99,8 @@ begin
  if entry_kind is null or entry_kind not in ('income','expense','transfer') then raise exception 'Choose an accounting classification'; end if;
  if source_id is null or (source_id<>l.id and (entry_kind<>'transfer' or destination_id is distinct from l.id)) then raise exception 'The selected wallet must be part of this transaction'; end if;
  if s.transaction_type='received' and not ((entry_kind='income' and source_id=l.id) or (entry_kind='transfer' and destination_id=l.id)) then raise exception 'Received money must enter the selected wallet'; end if;
- if s.transaction_type in ('sent','withdrawal','bill_payment') and (entry_kind='income' or source_id<>l.id) then raise exception 'This transaction leaves the selected wallet'; end if;
+ if s.transaction_type in ('sent','merchant_payment','bill_payment','airtime_purchase','data_purchase','bank_transfer') and (entry_kind<>'expense' or source_id<>l.id) then raise exception 'This transaction leaves the selected wallet as an expense'; end if;
+ if s.transaction_type='deposit' and (entry_kind<>'transfer' or destination_id<>l.id or source_id is null or source_id=l.id) then raise exception 'A deposit must transfer from a known source into the selected wallet'; end if;
  if s.transaction_type='withdrawal' and (entry_kind<>'transfer' or not exists(select 1 from public.money_locations where id=destination_id and user_id=u and location_type='cash')) then raise exception 'Withdrawals must transfer the principal to your Cash location'; end if;
  if p->>'decision'='match' then
   select * into e from public.financial_entries where id=(p->>'entry')::uuid and user_id=u and deleted_at is null;

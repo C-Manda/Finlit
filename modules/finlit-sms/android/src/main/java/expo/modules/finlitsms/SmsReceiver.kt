@@ -31,11 +31,12 @@ class SmsReceiver : BroadcastReceiver() {
           SmsQueue(context).use { q ->
             if(!q.enqueue(owner,sender,body,System.currentTimeMillis(),sent,subscription))prefs.edit().putBoolean("full_$owner",true).apply()
           }
+          prefs.edit().putString("lastReceiver_$owner",smsIsoTime()).putString("lastError_$owner",null).apply()
           context.sendBroadcast(Intent("expo.modules.finlitsms.CANDIDATE").setPackage(context.packageName))
         }
-      } catch (_:Exception) {
-        // Never log message text. A failed capture can be recovered by a manual inbox scan.
-        prefs.edit().putBoolean("full_$owner",true).apply()
+      } catch (error:Exception) {
+        // Keep diagnostics actionable without retaining message content.
+        prefs.edit().putString("lastError_$owner",error.message ?: "SMS receiver failed").apply()
       } finally { pending.finish() }
     }
   }

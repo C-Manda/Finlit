@@ -1,9 +1,15 @@
 import type { SmsMessage } from './types';
 export type SmsSettings = {enabled:boolean;baseline:string|null;lastScan:string|null;full:boolean;cache:string|null};
 export type ScanResult = {visited:number;candidates:number;before:number;beforeId:string;more:boolean;full:boolean};
+export type SmsDiagnostics = {
+ nativeAvailable:boolean; readSms:boolean; receiveSms:boolean; trackingEnabled:boolean;
+ ownerInitialized:boolean; lastReceiverEvent:string|null; lastScan:string|null;
+ messagesScanned:number; candidatesQueued:number; pendingQueue:number; lastError:string|null;
+};
 export interface SmsNative {
  setOwner(owner:string|null):Promise<void>;
- permissionStatus():Promise<{granted:boolean;canAskAgain:boolean}>;
+ permissionStatus():Promise<{granted:boolean;canAskAgain:boolean;readSms:boolean;receiveSms:boolean}>;
+ diagnostics(owner:string):Promise<SmsDiagnostics>;
  requestPermissions():Promise<{granted:boolean;canAskAgain:boolean}>;
  settings(owner:string):Promise<SmsSettings>;
  setEnabled(owner:string,enabled:boolean):Promise<void>;

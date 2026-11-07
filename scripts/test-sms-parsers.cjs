@@ -7,7 +7,7 @@ const fixtures=[
  ['Airtel','You have sent Money to SAMPLE PERSON on 63000000000.Amount K1,550. Txn. ID : MP261028.1707.Z00001.Your available balance is K101.42','airtel','sent',155000,null,10142,'MP261028.1707.Z00001',null],
  ['Airtel','Payment of ZMW 30.00 Till Number BUYAIRTEL ZESCO ZESCO. Airtel Money bal is ZMW 69.42. TID : MP261028.2008.Y00001.','airtel','bill_payment',3000,null,6942,'MP261028.2008.Y00001',null],
  ['Airtel','You have withdrawn ZMW 400.00 from 1300000 SAMPLE AGENT. Bal is ZMW 21.42. TID: CO261027.1918.E00001.','airtel','withdrawal',40000,null,2142,'CO261027.1918.E00001',null],
- ['Zamtel','Dear SAMPLE USER, your transaction of ZMW 45.00 for ZAMTEL USSD with Fee: ZMW .00 was processed successfully on 29-10-2026 at 00:14:54 under Txn ID: KUJ8TEST. Your account balance is now ZMW 1.00.\n#MakeLifeHappen with Zamtel','zamtel','unknown',4500,0,100,'KUJ8TEST','2026-10-28T22:14:54.000Z'],
+ ['Zamtel','Dear SAMPLE USER, your transaction of ZMW 45.00 for ZAMTEL USSD with Fee: ZMW .00 was processed successfully on 29-10-2026 at 00:14:54 under Txn ID: KUJ8TEST. Your account balance is now ZMW 1.00.\n#MakeLifeHappen with Zamtel','zamtel','merchant_payment',4500,0,100,'KUJ8TEST','2026-10-28T22:14:54.000Z'],
  ['Zamtel','Dear SAMPLE USER, you have received ZMW 45.00 from SAMPLE SENDER - 0760000000 on 14-10-2026 21:18:01 under Txn ID: SGLHTEST. Your account balance is now ZMW 46.00.','zamtel','received',4500,null,4600,'SGLHTEST','2026-10-14T19:18:01.000Z'],
 ];
 const message=(body,sender='MTN')=>({id:'fixture',body,sender,receivedAt:'2026-11-04T11:00:00.000Z',subscriptionId:null,fingerprint:'a'.repeat(64)});

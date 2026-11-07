@@ -6,7 +6,7 @@ import {usePalette} from '@/constants/finlit-theme';
 import {type BudgetData,currency,localDate} from '@/content/budget-rules';
 import {learningApi} from '@/services/learning';
 import {smsNative} from '@/features/sms/native';
-import type {SmsSettings,ScanResult} from '@/features/sms/native.types';
+import type {SmsSettings,ScanResult,SmsDiagnostics} from '@/features/sms/native.types';
 import type {LocalCandidate,SmsImport} from '@/features/sms/types';
 import {parseSms} from '@/features/sms/parsers/registry';
 import {minorUnits} from '@/features/sms/parsers/shared';
@@ -19,6 +19,7 @@ import {useLearningStyles} from './learning-screens';
 import {LocationPicker,locationName} from './money-locations';
 
 const initialSettings:SmsSettings={enabled:false,baseline:null,lastScan:null,full:false,cache:null};
+const initialDiagnostics:SmsDiagnostics={nativeAvailable:false,readSms:false,receiveSms:false,trackingEnabled:false,ownerInitialized:false,lastReceiverEvent:null,lastScan:null,messagesScanned:0,candidatesQueued:0,pendingQueue:0,lastError:null};
 const dateTime=(s:string)=>new Date(s).toLocaleString('en-ZM',{timeZone:'Africa/Lusaka',hour12:false});
 const amount=(n:number|null)=>n===null?'Not stated':currency(n/100);
 function Check({label,value,onChange,disabled}:{label:string;value:boolean;onChange:(v:boolean)=>void;disabled:boolean}){
@@ -27,7 +28,7 @@ function Check({label,value,onChange,disabled}:{label:string;value:boolean;onCha
 export function SmsTrackingScreen(){const {user}=useAuth();return user?<SmsBody key={user.id} owner={user.id}/>:null;}
 function SmsBody({owner}:{owner:string}){
  const s=useLearningStyles(),router=useRouter();
- const [settings,setSettings]=useState(initialSettings),[permission,setPermission]=useState(false),[data,setData]=useState<BudgetData|null>(null),[imports,setImports]=useState<SmsImport[]>([]);
+ const [settings,setSettings]=useState(initialSettings),[permission,setPermission]=useState(false),[diagnostics,setDiagnostics]=useState(initialDiagnostics),[data,setData]=useState<BudgetData|null>(null),[imports,setImports]=useState<SmsImport[]>([]);
  const [candidates,setCandidates]=useState<LocalCandidate[]>([]),[selected,setSelected]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [days,setDays]=useState('7'),[cursor,setCursor]=useState<ScanResult|null>(null),[clear,setClear]=useState(false),[confirmEnable,setConfirmEnable]=useState(false);
  const [manualBaseline,setManualBaseline]=useState(new Date().toISOString());
@@ -35,7 +36,7 @@ function SmsBody({owner}:{owner:string}){
  const alive=useRef(true),lock=useRef(false);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
  const refresh=useCallback(async()=>{
-  if(smsNative){await setSmsOwner(owner);const config=await smsNative.settings(owner),perm=await smsNative.permissionStatus();if(!alive.current)return;setSettings(config);setPermission(perm.granted);
+  if(smsNative){await setSmsOwner(owner);const config=await smsNative.settings(owner),perm=await smsNative.permissionStatus();const diag=await smsNative.diagnostics(owner);if(!alive.current)return;setSettings(config);setPermission(perm.granted);setDiagnostics(diag);
    if(config.cache){try{const cached=JSON.parse(config.cache);setData(cached.data);setImports(cached.imports??[]);}catch{/* Fetch a fresh snapshot below. */}}
    if(config.enabled&&perm.granted){await syncApproved(owner);const rows=await localCandidates(owner);if(alive.current)setCandidates(rows);}
   }
@@ -80,6 +81,8 @@ function SmsBody({owner}:{owner:string}){
    </View>}
    <LearningButton title="Android permission settings" secondary disabled={busy} onPress={()=>void Linking.openSettings()}/>
    <Text style={s.note}>Tracking baseline: {settings.baseline?dateTime(settings.baseline):'Not set'} · Last scan: {settings.lastScan?dateTime(settings.lastScan):'Never'}</Text>
+   <Text style={s.note}>Diagnostics: native {diagnostics.nativeAvailable?'available':'unavailable'} · READ_SMS {diagnostics.readSms?'granted':'missing'} · RECEIVE_SMS {diagnostics.receiveSms?'granted':'missing'} · owner {diagnostics.ownerInitialized?'ready':'not initialized'} · receiver {diagnostics.lastReceiverEvent?dateTime(diagnostics.lastReceiverEvent):'never'} · scanned {diagnostics.messagesScanned} · queued {diagnostics.candidatesQueued} · pending {diagnostics.pendingQueue}</Text>
+   {!!diagnostics.lastError&&<Text accessibilityRole="alert" style={s.body}>Last native capture/scan error: {diagnostics.lastError}</Text>}
    <Field label="Scan recent days (1–90)" value={days} onChangeText={v=>{setDays(v);setCursor(null);}} keyboardType="number-pad" editable={!busy}/>
    <LearningButton title="Scan existing SMS" disabled={busy||!settings.enabled||!permission} onPress={()=>void run(()=>scan())}/>
    {cursor?.more&&<LearningButton title="Scan next page" secondary disabled={busy||!settings.enabled||!permission} onPress={()=>void run(()=>scan(true))}/>}

@@ -12,7 +12,7 @@ export async function localCandidates(owner:string):Promise<LocalCandidate[]> {
   if(activeOwner!==owner)return [];
   if(row.payload){try {items.push(JSON.parse(row.payload) as LocalCandidate);continue;}catch{/* Reparse damaged review metadata from the retained SMS. */}}
   const parsed=parseSms(row);
-  if(!parsed){await smsNative.acknowledge(owner,row.id);continue;}
+  if(!parsed)continue;
   const message={id:row.id,sender:row.sender,body:row.body,receivedAt:row.receivedAt,subscriptionId:row.subscriptionId,fingerprint:row.fingerprint}; // Raw text remains in Android's app-private database.
   const candidate={message,parsed};await smsNative.saveCandidate(owner,row.id,JSON.stringify(candidate));items.push(candidate);
  }

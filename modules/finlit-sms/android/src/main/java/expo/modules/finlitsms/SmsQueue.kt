@@ -39,6 +39,7 @@ class SmsQueue(context: Context) : SQLiteOpenHelper(context, "finlit_sms.db", nu
       rows
     }
   }
+  fun pendingCount(owner:String):Int = readableDatabase.rawQuery("SELECT count(*) FROM candidates WHERE owner=? AND done=0",arrayOf(owner)).use { it.moveToFirst();it.getInt(0) }
   fun save(owner:String,id:String,payload:String) {
     require(payload.length<=20000) { "Candidate too large" };JSONObject(payload)
     writableDatabase.update("candidates",ContentValues().apply {put("payload",payload)},"owner=? AND id=? AND done=0",arrayOf(owner,id))
