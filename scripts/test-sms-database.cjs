@@ -7,11 +7,17 @@ const {setup}=require('./test-database.cjs');
  const api=async(action,p={})=>(await db.query('select public.finlit_api($1,$2::jsonb) data',[action,JSON.stringify(p)])).rows[0].data;
  await as(user);let budget=await api('budget');const cash=budget.locations[0],income=budget.categories.find(c=>c.entry_type==='income'),expense=budget.categories.find(c=>c.entry_type==='expense');
  const wallet=await api('create_location',{type:'mobile_money',provider:'MTN MoMo',colour:'#f6d365',opening:500,date:'2026-01-01',request:randomUUID()});
+ const destination=await api('create_location',{type:'mobile_money',provider:'Airtel Money',colour:'#ff8a80',opening:100,date:'2026-01-01',request:randomUUID()});
+ const foreignWallet=await (async()=>{await as(other);const x=await api('create_location',{type:'mobile_money',provider:'MTN MoMo',colour:'#90caf9',opening:100,date:'2026-01-01',request:randomUUID()});await as(user);return x;})();
  const fingerprint=()=>createHash('sha256').update(randomUUID()).digest('hex');
  const candidate={baseline:'2026-01-01T00:00:00+02:00',wallet:wallet.id,walletConfirmed:true,provider:'mtn',kind:'received',amountMinor:5000,feeMinor:null,balanceMinor:55000,reference:'TEST-1',fingerprint:fingerprint(),occurredAt:'2026-02-01T10:00:00Z',receivedAt:'2026-02-01T10:00:10Z',timestampSource:'provider',parserVersion:'finlit-sms-1'};
  const stage=p=>api('sms_stage',{...candidate,...p});
  const decision={confirmed:true,feeConfirmed:true,feeMinor:0,type:'income',source:wallet.id,category:income.id,decision:'import'};
  const resolve=(s,p={})=>api('sms_resolve',{id:s.id,...decision,...p});
+ const transfer=async(overrides={})=>{
+  const s=await stage({kind:'bank_transfer',reference:'NFS-'+randomUUID(),amountMinor:1000,feeMinor:0,fingerprint:fingerprint(),...overrides});
+  return {s,resolve:(p={})=>resolve(s,{type:'transfer',category:null,source:wallet.id,destination:destination.id,direction:'out',...p})};
+ };
  const bal=async id=>(await api('budget')).locations.find(l=>l.id===id).balance;
  const first=await stage({});assert.equal((await stage({})).id,first.id);assert.equal((await stage({fingerprint:fingerprint()})).id,first.id);
  await assert.rejects(()=>resolve(first,{feeConfirmed:false}),/Confirm the actual fee/);
@@ -23,6 +29,17 @@ const {setup}=require('./test-database.cjs');
  const withdrawal=await stage({reference:'CASH',fingerprint:fingerprint(),kind:'withdrawal',amountMinor:10000,feeMinor:250,occurredAt:new Date().toISOString(),receivedAt:new Date().toISOString()});
  await assert.rejects(()=>resolve(withdrawal,{type:'expense',category:expense.id,feeMinor:250}),/Withdrawals/);
  await resolve(withdrawal,{type:'transfer',destination:cash.id,category:null,feeMinor:250});assert.equal(await bal(wallet.id),497.5);assert.equal(await bal(cash.id),100);
+ const totals=async()=>{const entries=(await api('budget')).entries;return entries.filter(e=>e.entry_type==='income'||e.entry_type==='expense').reduce((a,e)=>{a[e.entry_type]+=Number(e.amount)+Number(e.fee_amount??0);return a;},{income:0,expense:0});};
+ const beforeNfs=await totals();
+ const incoming=await transfer({});await incoming.resolve({source:destination.id,destination:wallet.id,direction:'in'});assert.equal(await bal(wallet.id),507.5);
+ const outgoing=await transfer({});await outgoing.resolve();assert.equal(await bal(wallet.id),497.5);assert.deepEqual(await totals(),beforeNfs);
+ for(const bad of [
+  {source:destination.id,destination:wallet.id,direction:'out'},
+  {source:destination.id,destination:destination.id,direction:'out'},
+  {source:foreignWallet.id,destination:wallet.id,direction:'in'},
+  {source:destination.id,destination:foreignWallet.id,direction:'out'},
+ ]){const x=await transfer();await assert.rejects(()=>x.resolve(bad),/NFS transfers|selected wallet/);}
+ const poorTransfer=await transfer({amountMinor:99999900});await assert.rejects(()=>poorTransfer.resolve(),/Insufficient/);
  const poor=await stage({reference:'TOO-MUCH',fingerprint:fingerprint(),kind:'sent',amountMinor:99999900});const before=(await api('budget')).entries.length;
  await assert.rejects(()=>resolve(poor,{type:'expense',category:expense.id}),/Insufficient/);assert.equal((await api('budget')).entries.length,before);assert.equal((await api('sms_list')).find(x=>x.id===poor.id).status,'requires_review');
  const manual=await api('entry',{type:'expense',amount:20,fee:1,category:expense.id,location:wallet.id,date:'2026-02-02',request:randomUUID()});
@@ -30,6 +47,8 @@ const {setup}=require('./test-database.cjs');
  await assert.rejects(()=>resolve(matching,{type:'expense',feeMinor:100,category:expense.id}),/similar entry/);
  await resolve(matching,{decision:'match',entry:manual.id,type:'expense',feeMinor:100});assert.equal((await api('budget')).entries.length,before+1);
  assert.equal((await api('budget')).entries.find(x=>x.id===manual.id).occurred_at,'2026-02-02T10:00:00+00:00');
+ await db.exec('reset role');await db.query('update public.money_locations set active=false where id=$1',[destination.id]);await as(user);
+ const inactive=await transfer();await assert.rejects(()=>inactive.resolve(),/NFS transfers/);
  await as(other);assert.deepEqual(await api('sms_list'),[]);assert.equal((await db.query('select * from sms_imports')).rows.length,0);
  await assert.rejects(()=>resolve(first),/unavailable/);await assert.rejects(()=>stage({reference:'FOREIGN'}),/active Mobile Money/);
  await assert.rejects(()=>db.exec("delete from public.sms_imports"),/permission denied/);

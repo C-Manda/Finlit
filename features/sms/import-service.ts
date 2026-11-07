@@ -1,6 +1,7 @@
 import {learningApi} from '../../services/learning';
 import {smsNative} from './native';
-import {parseSms} from './parsers/registry';
+import {isReviewableFinancialMessage,parseSms} from './parsers/registry';
+import {result} from './parsers/shared';
 import type {LocalCandidate,SmsImport} from './types';
 let activeOwner:string|null=null;
 let task:Promise<void>|null=null;
@@ -11,7 +12,7 @@ export async function localCandidates(owner:string):Promise<LocalCandidate[]> {
  for(const row of rows){
   if(activeOwner!==owner)return [];
   if(row.payload){try {items.push(JSON.parse(row.payload) as LocalCandidate);continue;}catch{/* Reparse damaged review metadata from the retained SMS. */}}
-  const parsed=parseSms(row);
+  const parsed=parseSms(row)??(isReviewableFinancialMessage(row)?result(row,'unknown','unknown',null,null,null):null);
   if(!parsed)continue;
   const message={id:row.id,sender:row.sender,body:row.body,receivedAt:row.receivedAt,subscriptionId:row.subscriptionId,fingerprint:row.fingerprint}; // Raw text remains in Android's app-private database.
   const candidate={message,parsed};await smsNative.saveCandidate(owner,row.id,JSON.stringify(candidate));items.push(candidate);
