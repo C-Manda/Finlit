@@ -7,7 +7,7 @@ import {type BudgetData,currency,localDate} from '@/content/budget-rules';
 import {learningApi} from '@/services/learning';
 import {smsNative} from '@/features/sms/native';
 import type {SmsSettings,ScanResult,SmsDiagnostics} from '@/features/sms/native.types';
-import type {LocalCandidate,SmsImport} from '@/features/sms/types';
+import type {LocalCandidate,SmsDirection,SmsImport} from '@/features/sms/types';
 import {parseSms} from '@/features/sms/parsers/registry';
 import {minorUnits} from '@/features/sms/parsers/shared';
 import {manualFingerprint} from '@/features/sms/fingerprint';
@@ -117,7 +117,7 @@ function SmsReview({candidate,data,imports,busy,baseline,onClose,onConfirm}:{can
  const wallets=suggestedWallets(p,data.locations??[]),old=candidate.approval;
  const [wallet,setWallet]=useState(String(old?.wallet??(wallets.length===1?wallets[0].id:'')));
  const [type,setType]=useState(String(old?.type??(p.kind==='withdrawal'||p.kind==='bank_transfer'?'transfer':p.kind==='received'?'income':'expense')));
- const [direction,setDirection]=useState<'in'|'out'>(p.direction==='in'?'in':p.direction==='out'?'out':'out');
+ const [direction,setDirection]=useState<SmsDirection>(old?.direction==='in'||old?.direction==='out'?old.direction:p.direction);
  const [other,setOther]=useState(String(old?.destination??(p.kind==='withdrawal'?(data.locations??[]).find(l=>l.location_type==='cash')?.id??'':'')));
  const [category,setCategory]=useState(String(old?.category??'')),[fee,setFee]=useState(old?.feeMinor!==undefined?String(Number(old.feeMinor)/100):p.feeMinor===null?'':String(p.feeMinor/100));
  const [description,setDescription]=useState(String(old?.description??'')),[match,setMatch]=useState(''),[verified,setVerified]=useState(false),[feeConfirmed,setFeeConfirmed]=useState(false),[baselineConfirmed,setBaselineConfirmed]=useState(false),[distinctConfirmed,setDistinctConfirmed]=useState(false),[error,setError]=useState('');
@@ -129,9 +129,9 @@ function SmsReview({candidate,data,imports,busy,baseline,onClose,onConfirm}:{can
   if(!wallet){setError('Choose and confirm the wallet for this message.');return;}
   const feeMinor=minorUnits(fee);
   if(decision==='import'||decision==='match'){
-   if(!verified||feeMinor===null||!feeConfirmed||(sameDay&&!baselineConfirmed)||(!match&&type!=='transfer'&&!category)||(type==='transfer'&&(!other||other===wallet))){setError('Confirm the wallet, transaction, fee, classification and opening-day boundary before posting.');return;}
+   if(!verified||feeMinor===null||!feeConfirmed||(sameDay&&!baselineConfirmed)||(!match&&type!=='transfer'&&!category)||(type==='transfer'&&(direction==='unknown'||!other||other===wallet))){setError(type==='transfer'&&direction==='unknown'?'Choose whether this transfer is incoming or outgoing before confirming.':'Confirm the wallet, transaction, fee, classification and opening-day boundary before posting.');return;}
   }
-  setError('');void onConfirm({wallet,baseline,decision,confirmed:verified,feeConfirmed,feeMinor,baselineConfirmed,distinctConfirmed,type,category:category||null,source:type==='transfer'&&direction==='in'?other:wallet,destination:type==='transfer'?(direction==='in'?wallet:other):null,description,entry:match||null});
+  setError('');void onConfirm({wallet,baseline,decision,confirmed:verified,feeConfirmed,feeMinor,baselineConfirmed,distinctConfirmed,type,direction,category:category||null,source:type==='transfer'&&direction==='in'?other:wallet,destination:type==='transfer'?(direction==='in'?wallet:other):null,description,entry:match||null});
  };
  return <View style={s.card}>
   <Text style={s.heading}>Review {providerName(p.provider)} message</Text>
@@ -147,7 +147,9 @@ function SmsReview({candidate,data,imports,busy,baseline,onClose,onConfirm}:{can
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{['income','expense','transfer'].map(t=><LearningButton key={t} title={(type===t?'● ':'○ ')+t} secondary disabled={busy} onPress={()=>{setType(t);setCategory('');setMatch('');}}/>)}</View>
    <Text style={s.note}>Received money may be an own-account transfer or borrowing, not earnings. Refunds and reversals need separate review. Withdrawals transfer principal to Cash.</Text>
    {type==='transfer'?<>
-    <LearningButton title={direction==='out'?'Direction: out of this wallet':'Direction: into this wallet'} secondary onPress={()=>setDirection(direction==='in'?'out':'in')}/>
+    <Text style={s.body}>Transfer direction</Text>
+    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{(['in','out'] as const).map(value=><LearningButton key={value} title={(direction===value?'● ':'○ ')+(value==='in'?'Incoming':'Outgoing')} secondary disabled={busy} onPress={()=>{setDirection(value);setOther('');}}/>)}</View>
+    {direction==='unknown'&&<Text style={s.note}>Choose incoming or outgoing after checking the original message. Unknown direction cannot be posted.</Text>}
     <LocationPicker label={direction==='in'?'Transfer source':'Transfer destination'} locations={(data.locations??[]).filter(l=>l.id!==wallet)} value={other} onChange={setOther} disabled={busy} allowUnassigned={false}/>
    </>:<><Text style={s.body}>Category</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{data.categories.filter(c=>c.entry_type===type&&c.name!=='Transaction fees'&&c.name!=='Savings').map(c=><Pressable key={c.id} accessibilityRole="radio" aria-checked={category===c.id} disabled={busy} onPress={()=>setCategory(c.id)} style={[s.card,{padding:12,borderWidth:1,borderColor:category===c.id?palette.ink:palette.line}]}><Text style={s.body}>{category===c.id?'●':'○'} {c.name}</Text></Pressable>)}</View></>}
    <Field label="Confirmed fee (K; enter 0 only if verified)" value={fee} onChangeText={v=>{setFee(v);setFeeConfirmed(false);}} keyboardType="decimal-pad" editable={!busy&&p.feeMinor===null}/>

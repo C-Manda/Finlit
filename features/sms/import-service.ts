@@ -22,6 +22,7 @@ export async function submitCandidate(candidate:LocalCandidate,approval:Record<s
  const p=candidate.parsed;
  const staged=await learningApi<SmsImport>('sms_stage',{
   wallet:approval.wallet,walletConfirmed:true,baseline:approval.baseline,provider:p.provider,kind:p.kind,
+  direction:approval.direction??p.direction,
   amountMinor:p.amountMinor,feeMinor:p.feeMinor,balanceMinor:p.balanceMinor,reference:p.reference,
   fingerprint:candidate.message.fingerprint,occurredAt:p.occurredAt,receivedAt:p.receivedAt,timestampSource:p.timestampSource,parserVersion:p.parserVersion,
  });
