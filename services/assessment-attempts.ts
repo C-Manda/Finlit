@@ -1,6 +1,7 @@
 import type { Tables, TablesInsert, TablesUpdate } from '@/types/database.types';
 
 import { supabase } from '@/lib/supabase';
+import { recordEngagementActivity } from '@/services/engagement';
 
 export type AssessmentAttempt = Tables<'assessment_attempts'>;
 export type AssessmentAnswer = Tables<'assessment_answers'>;
@@ -95,7 +96,10 @@ export async function saveAssessmentAnswer(
 export async function submitAssessmentAttempt(userId: string, attemptId: string): Promise<AssessmentAttempt> {
   const existing = await getAssessmentAttempt(userId, attemptId);
   if (!existing) throw new Error('Assessment attempt not found.');
-  if (existing.completed_at) return existing; // Retry after a lost response.
+  if (existing.completed_at) {
+    await recordEngagementActivity('assessment_completed', attemptId);
+    return existing;
+  } // Retry after a lost response.
   const [{ data: questions, error: questionError }, { data: answers, error: answerError }] = await Promise.all([
     supabase.from('assessment_questions').select('id').eq('assessment_id', existing.assessment_id),
     supabase.from('assessment_answers').select('question_id').eq('attempt_id', attemptId),
@@ -125,7 +129,10 @@ export async function submitAssessmentAttempt(userId: string, attemptId: string)
   if (error) throw error;
   if (!data) {
     const submitted = await getAssessmentAttempt(userId, attemptId);
-    if (submitted?.completed_at) return submitted;
+    if (submitted?.completed_at) {
+      await recordEngagementActivity('assessment_completed', attemptId);
+      return submitted;
+    }
     throw new Error('Submission was not saved. Please retry.');
   }
   return data;

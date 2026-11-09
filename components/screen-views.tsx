@@ -18,6 +18,7 @@ import { useProfile } from "@/hooks/use-profile";
 import { describeSupabaseError } from "@/lib/supabase-diagnostics";
 import { LearningPath } from "./learning-screens";
 import { BudgetScreen } from "./budget-screens";
+import { ProfileEngagement } from "./engagement/profile-engagement";
 export { LoginView } from "./auth-views";
 export { HomeScreen as HomeView } from "./home-screen";
 export const LearnView = LearningPath;
@@ -120,6 +121,7 @@ export function ProfileView() {
             )}
           </Text>
         ) : null}
+        <ProfileEngagement />
         <Pressable
           accessibilityRole="button"
           style={styles.savedItem}

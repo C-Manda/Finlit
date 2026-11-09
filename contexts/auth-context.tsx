@@ -4,6 +4,7 @@ import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 
 import { getSession, onAuthStateChange, signIn, signOut, signUp } from '@/services/auth';
+import { disableAndroidPushTokens } from '@/services/notifications';
 import { clearRecoverySessionCache, establishRecoverySession, passwordResetRedirect, requestPasswordReset, recoveryWorkInProgress, updateRecoveredPassword } from '@/services/password-recovery';
 import { INVALID_RECOVERY_LINK, parseRecoveryLink, type RecoveryStatus } from '@/lib/password-recovery';
 
@@ -119,7 +120,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   const value: AuthContextValue = {
     session, user: session?.user ?? null, isLoading,
-    signIn, signUp: (email, password, fullName) => signUp({ email, password, options: { data: { full_name: fullName } } }), signOut: () => { clearPasswordRecovery(); return signOut(); },
+    signIn, signUp: (email, password, fullName) => signUp({ email, password, options: { data: { full_name: fullName } } }), signOut: async () => {
+      clearPasswordRecovery();
+      if (session?.user.id) await disableAndroidPushTokens(session.user.id);
+      return signOut();
+    },
     recoveryStatus, recoveryError, requestPasswordReset, updatePassword, clearPasswordRecovery,
     retryPasswordRecovery: () => { if (lastRecoveryUrl.current) handleRecoveryUrl(lastRecoveryUrl.current); },
   };

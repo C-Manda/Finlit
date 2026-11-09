@@ -1,6 +1,7 @@
 import type { Tables } from '@/types/database.types';
 
 import { supabase } from '@/lib/supabase';
+import { recordEngagementActivity } from '@/services/engagement';
 
 export type LessonProgress = Tables<'lesson_progress'>;
 export type ModuleProgress = Tables<'module_progress'>;
@@ -29,7 +30,10 @@ export async function getLessonProgress(userId: string, lessonId: string): Promi
 
 export async function completeLesson(userId: string, lessonId: string): Promise<LessonProgress> {
   const existing = await getLessonProgress(userId, lessonId);
-  if (existing?.is_completed) return existing;
+  if (existing?.is_completed) {
+    await recordEngagementActivity('lesson_completed', lessonId);
+    return existing;
+  }
   const { data, error } = await supabase
     .from('lesson_progress')
     .upsert({
@@ -44,6 +48,7 @@ export async function completeLesson(userId: string, lessonId: string): Promise<
     throw new Error('Lesson completion is coming soon for this lesson. You can still review its content.');
   }
   if (error) throw error;
+  await recordEngagementActivity('lesson_completed', lessonId);
   return data;
 }
 

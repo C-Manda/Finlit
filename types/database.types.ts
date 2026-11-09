@@ -348,6 +348,33 @@ export type Database = {
         }
         Relationships: []
       }
+      engagement_activity: {
+        Row: {
+          activity_date: string
+          activity_type: string
+          created_at: string
+          id: string
+          source_key: string
+          user_id: string
+        }
+        Insert: {
+          activity_date: string
+          activity_type: string
+          created_at?: string
+          id?: string
+          source_key: string
+          user_id: string
+        }
+        Update: {
+          activity_date?: string
+          activity_type?: string
+          created_at?: string
+          id?: string
+          source_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       balance_adjustments: {
         Row: {
           amount: number
@@ -546,6 +573,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      financial_tips: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          sort_order: number
+          tip_text: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          tip_text: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          tip_text?: string
+        }
+        Relationships: []
       }
       learner_assessment_state: {
         Row: {
@@ -857,25 +911,49 @@ export type Database = {
       }
       notification_preferences: {
         Row: {
+          budget_tips_enabled: boolean
+          general_tips_enabled: boolean
+          inactivity_reminders_enabled: boolean
           inactivity_days: number
+          notification_frequency: string
+          permission_status: string
           reminder_time: string
           reminders_enabled: boolean
+          quiet_hours_end: string
+          quiet_hours_start: string
+          streak_reminders_enabled: boolean
           timezone: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          budget_tips_enabled?: boolean
+          general_tips_enabled?: boolean
+          inactivity_reminders_enabled?: boolean
           inactivity_days?: number
+          notification_frequency?: string
+          permission_status?: string
           reminder_time?: string
           reminders_enabled?: boolean
+          quiet_hours_end?: string
+          quiet_hours_start?: string
+          streak_reminders_enabled?: boolean
           timezone?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          budget_tips_enabled?: boolean
+          general_tips_enabled?: boolean
+          inactivity_reminders_enabled?: boolean
           inactivity_days?: number
+          notification_frequency?: string
+          permission_status?: string
           reminder_time?: string
           reminders_enabled?: boolean
+          quiet_hours_end?: string
+          quiet_hours_start?: string
+          streak_reminders_enabled?: boolean
           timezone?: string
           updated_at?: string
           user_id?: string
@@ -989,6 +1067,48 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           last_seen_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notification_delivery_log: {
+        Row: {
+          category: string
+          created_at: string
+          delivered_at: string | null
+          device_id: string | null
+          error_message: string | null
+          id: string
+          notification_key: string
+          provider_ticket: string | null
+          scheduled_for: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          delivered_at?: string | null
+          device_id?: string | null
+          error_message?: string | null
+          id?: string
+          notification_key: string
+          provider_ticket?: string | null
+          scheduled_for: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          delivered_at?: string | null
+          device_id?: string | null
+          error_message?: string | null
+          id?: string
+          notification_key?: string
+          provider_ticket?: string | null
+          scheduled_for?: string
+          status?: string
           user_id?: string
         }
         Relationships: []
@@ -1188,6 +1308,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      record_engagement_activity: {
+        Args: {
+          p_activity_type: string
+          p_source_key: string
+        }
+        Returns: Json
+      }
+      get_engagement_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       finlit_api: {
         Args: { p_action: string; p_payload?: Json }
         Returns: Json
