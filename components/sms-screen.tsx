@@ -82,7 +82,7 @@ function SmsBody({owner}:{owner:string}){
    {confirmEnable&&!settings.enabled&&<View style={s.stack}>
     <Text style={s.body}>FinLit will read relevant financial SMS on this device and queue new messages locally. Nothing is posted without confirmation. Check your wallets’ current balances first. Tracking starts now; earlier activity is history-only, because it may already be included in those balances.</Text>
     <LearningButton title="Check Money Locations" secondary onPress={()=>router.push('/budget')}/>
-    <LearningButton title="Grant permission and start tracking" disabled={busy} onPress={()=>void run(async()=>{const result=await smsNative!.requestPermissions();setPermission(result.granted);if(!result.granted)throw new Error('SMS access was not granted. You can continue using manual Budget entries.');await smsNative!.setEnabled(owner,true);setConfirmEnable(false);await refresh();})}/>
+    <LearningButton title="Grant permission and start tracking" disabled={busy} onPress={()=>void run(async()=>{const result=await smsNative!.requestPermissions();setPermission(result.granted);if(!result.granted)throw new Error('SMS access was not granted. You can continue using manual Budget entries.');await smsNative!.setEnabled(owner,true);setConfirmEnable(false);await refresh();await scan();})}/>
     <LearningButton title="Cancel setup" secondary onPress={()=>setConfirmEnable(false)}/>
    </View>}
    <LearningButton title="Android permission settings" secondary disabled={busy} onPress={()=>void Linking.openSettings()}/>

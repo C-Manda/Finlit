@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { usePalette } from "@/constants/finlit-theme";
 import {
   currency,
@@ -9,7 +10,7 @@ import {
   type BudgetData,
   type MoneyLocation,
 } from "@/content/budget-rules";
-import { Field } from "./finlit-ui";
+import { Field, OverflowMenu } from "./finlit-ui";
 import { LearningButton } from "./lesson-player";
 import { useLearningStyles } from "./learning-screens";
 
@@ -103,7 +104,8 @@ export function MoneyLocations({
   onSave: (action: string, payload: object, done: () => void) => Promise<void>;
 }) {
   const s = useLearningStyles(),
-    palette = usePalette();
+    palette = usePalette(),
+    router = useRouter();
   const [mode, setMode] = useState<"none" | "add" | "adjust" | "delete">(
     "none",
   );
@@ -225,6 +227,15 @@ export function MoneyLocations({
           <Ionicons name="add" size={20} color={palette.ink} />
           <Text style={s.body}>Add</Text>
         </Pressable>
+        <OverflowMenu
+          label="Money Locations actions"
+          items={[
+            { label: "Correct a balance", onPress: () => start("adjust"), disabled: busy },
+            { label: "Delete a location", onPress: () => start("delete"), disabled: busy || !active.some((l) => l.location_type !== "cash") },
+            { label: history ? "Hide balance history" : "Balance history", onPress: () => setHistory(value => !value), disabled: busy },
+            { label: "Mobile Money SMS tracking", onPress: () => router.push("/budget/sms" as never), disabled: busy },
+          ]}
+        />
       </View>
       <Text style={s.note}>See where your money is kept</Text>
       <Text style={s.body}>Total Available Money</Text>
@@ -321,24 +332,7 @@ export function MoneyLocations({
         Opening balances and corrections are not income. Unassigned entries
         affect reports only.
       </Text>
-      {mode === "none" ? (
-        <>
-          <LearningButton
-            title="Correct a balance"
-            secondary
-            disabled={busy}
-            onPress={() => start("adjust")}
-          />
-          {active.some((l) => l.location_type !== "cash") && (
-            <LearningButton
-              title="Delete a location"
-              secondary
-              disabled={busy}
-              onPress={() => start("delete")}
-            />
-          )}
-        </>
-      ) : (
+      {mode !== "none" && (
         <View style={s.card}>
           <Text style={s.heading}>
             {mode === "add"
@@ -556,12 +550,6 @@ export function MoneyLocations({
           />
         </View>
       )}
-      <LearningButton
-        title={history ? "Hide balance history" : "Balance history"}
-        secondary
-        disabled={busy}
-        onPress={() => setHistory(!history)}
-      />
       {history && (
         <View style={s.card}>
           {locations.map((l) => (

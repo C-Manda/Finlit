@@ -3,12 +3,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, usePathname, useRouter } from 'expo-router';
 import { useState, type ComponentProps, type ReactNode } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { radii, spacing, usePalette, useCommonStyles, themedStyles } from '@/constants/finlit-theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 type Tone = 'blush' | 'mint' | 'blue' | 'peach' | 'lilac';
+export type OverflowMenuItem = { label: string; onPress: () => void; disabled?: boolean };
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   const commonStyles = useCommonStyles();
@@ -80,6 +81,25 @@ export function PasswordField({ label = 'Password', editable = true, ...inputPro
     </View>
   </View>;
 }
+export function OverflowMenu({ label = 'More actions', items }: { label?: string; items: OverflowMenuItem[] }) {
+  const styles = useStyles();
+  const palette = usePalette();
+  const [open, setOpen] = useState(false);
+  return <View>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ expanded: open }} onPress={() => setOpen(true)} style={styles.overflowTrigger}>
+      <Ionicons name="ellipsis-horizontal" size={22} color={palette.ink} />
+    </Pressable>
+    <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Pressable accessibilityLabel="Close menu" onPress={() => setOpen(false)} style={styles.overflowBackdrop}>
+        <Pressable onPress={event => event.stopPropagation()} style={styles.overflowMenu}>
+          {items.map(item => <Pressable key={item.label} accessibilityRole="button" accessibilityLabel={item.label} accessibilityState={{ disabled: item.disabled }} disabled={item.disabled} onPress={() => { setOpen(false); item.onPress(); }} style={[styles.overflowItem, item.disabled && { opacity: 0.45 }]}>
+            <Text style={styles.overflowText}>{item.label}</Text>
+          </Pressable>)}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  </View>;
+}
 export function BottomNavigation() {
   const styles = useStyles();
   const palette = usePalette();
@@ -130,6 +150,11 @@ const useStyles = themedStyles(palette => ({
   passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: radii.sm, backgroundColor: palette.surface },
   passwordInput: { flex: 1, minWidth: 0, minHeight: 50, color: palette.ink, paddingHorizontal: 12, fontSize: 15 },
   passwordToggle: { minWidth: 48, minHeight: 50, alignItems: 'center', justifyContent: 'center' },
+  overflowTrigger: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  overflowBackdrop: { flex: 1, alignItems: 'flex-end', paddingTop: 72, paddingRight: spacing.md },
+  overflowMenu: { minWidth: 220, paddingVertical: spacing.xs, borderRadius: radii.md, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  overflowItem: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md },
+  overflowText: { color: palette.ink, fontSize: 13 },
   field: { gap: 5, marginBottom: spacing.sm },
   input: { minHeight: 46, borderWidth: 1, borderColor: palette.line, borderRadius: radii.sm, backgroundColor: palette.surface, color: palette.ink, paddingHorizontal: 12, fontSize: 13 },
   bottomNav: { position: 'absolute', left: 12, right: 12, bottom: 10, padding: 6, borderRadius: 22, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, flexDirection: 'row', justifyContent: 'space-around', elevation: 1, shadowColor: '#32232a', shadowOpacity: 0.04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },

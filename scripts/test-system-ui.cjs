@@ -198,9 +198,10 @@ async function answerAssessment(key,count){
  await until('document.body.innerText.includes("Total Available Money")','Linked income not saved');assert.equal((await api('budget')).available,700);
  await button('Add entry to MTN MoMo');await button('Moving between my own accounts','checkbox');await button('Destination: FNB Savings · K0.00','radio');await setInput('Amount (K)','200');await setInput('Transfer fee (K, optional)','2');await button('Save transaction');
  await until('document.body.innerText.includes("Total Available Money")','Linked transfer not saved');locationData=await api('budget');assert.equal(locationData.available,698);assert.equal(locationData.locations.find(l=>l.id===uiBank.id).balance,200);
- await button('Correct a balance');await button('Cash · K0.00','radio');await setInput('Correct balance (K)','450');await setInput('Reason (optional)','Cash counted');await button('Save correction');
+ await button('Money Locations actions');await button('Correct a balance');await button('Cash · K0.00','radio');await setInput('Correct balance (K)','450');await setInput('Reason (optional)','Cash counted');await button('Save correction');
+
  await until('document.body.innerText.includes("Total Available Money")&&!document.body.innerText.includes("Correct balance (K)")','Correction not saved');assert.equal((await api('budget')).available,1148);
- await button('Balance history');await until('document.body.innerText.includes("Cash counted")','Audit history missing');await button('Hide balance history');
+ await button('Money Locations actions');await button('Balance history');await until('document.body.innerText.includes("Cash counted")','Audit history missing');await button('Money Locations actions');await button('Hide balance history');
  for(const theme of ['light','dark']) {
   await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:theme}]});
   await evaluate(`Array.from(document.querySelectorAll('[dir=auto]')).find(e=>e.textContent==='My Money Locations').scrollIntoView({block:'start'})`);await delay(200);
@@ -210,7 +211,7 @@ async function answerAssessment(key,count){
  await button('Add money location');await button('● Mobile Money');await button('○ Other provider');await setInput('Mobile money provider name','Zamtel Kwacha');await button('Peach','radio');await button('Save money location');
  await until('document.body.innerText.includes("Zamtel Kwacha")&&!document.body.innerText.includes("Opening balance (K)")','Custom provider not saved');
  const customProviderData=await api('budget');const customProviderLocation=customProviderData.locations.find(l=>l.provider==='Zamtel Kwacha');assert.equal(customProviderLocation.colour,'#f1dfd3');
- await button('Delete a location');await button('Zamtel Kwacha · K0.00','radio');await button('Confirm deletion');
+ await button('Money Locations actions');await button('Delete a location');await button('Zamtel Kwacha · K0.00','radio');await button('Confirm deletion');
  await until(`!document.querySelector('[aria-label="Add entry to Zamtel Kwacha"]')&&!document.body.innerText.includes("Confirm deletion")`,'Deleted location still visible');
  assert.equal((await api('budget')).locations.find(l=>l.id===customProviderLocation.id).active,false);assert.equal((await api('budget')).available,customProviderData.available);
  // SMS manual review uses real parser, confirmation UI and the same ledger RPC.
