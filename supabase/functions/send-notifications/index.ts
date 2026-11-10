@@ -133,24 +133,27 @@ Deno.serve(async request => {
     }
     const ticketIds = results.flatMap(result => result?.id ? [result.id] : []);
     let receiptError: string | null = null;
+    let receiptsPending = false;
     if (ticketIds.length) {
       try {
         const receipts = await getExpoReceipts(ticketIds);
         const receiptValues = ticketIds.map(id => receipts[id]).filter(Boolean);
         const receiptFailures = receiptValues.filter(receipt => receipt.status === "error");
+        receiptsPending = receiptValues.length < ticketIds.length;
         if (receiptFailures.length) {
           receiptError = receiptFailures.map(receipt => receipt.details?.error ?? receipt.message ?? "Expo receipt failed").join("; ");
           errors.push(receiptError);
         }
       } catch (error) {
-        receiptError = error instanceof Error ? error.message : "Expo receipt request failed";
+        receiptsPending = true;
+        errors.push(error instanceof Error ? error.message : "Expo receipt request failed");
       }
     }
-    const finalStatus = accepted > 0 && !receiptError ? "sent" : "failed";
+    const finalStatus = accepted === 0 ? "failed" : receiptError ? "failed" : receiptsPending ? "pending" : "sent";
     const { error: deliveryUpdateError } = await admin.from("notification_delivery_log").update({
       status: finalStatus,
       provider_ticket_id: results.find(result => result?.id)?.id ?? null,
-      provider_receipt_status: receiptError ? "error" : accepted > 0 ? "ok" : "rejected",
+      provider_receipt_status: receiptError ? "error" : receiptsPending ? "pending" : accepted > 0 ? "ok" : "rejected",
       delivered_at: finalStatus === "sent" ? new Date().toISOString() : null,
       error_message: errors.length ? errors.join("; ") : null,
     }).eq("user_id", input.userId).eq("notification_type", input.notificationType).eq("delivery_key", input.deliveryKey);

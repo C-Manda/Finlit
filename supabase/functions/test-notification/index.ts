@@ -48,6 +48,7 @@ Deno.serve(async request => {
     }
     const accepted = results.filter(result => result.status === "ok").length;
     let receiptError: string | null = null;
+    let receiptsPending = false;
     for (let index = 0; index < results.length; index += 1) {
       const error = results[index]?.details?.error;
       if (error === "DeviceNotRegistered" || error === "InvalidCredentials") {
@@ -62,25 +63,28 @@ Deno.serve(async request => {
     if (ticketIds.length) {
       try {
         const receipts = await getExpoReceipts(ticketIds);
-        const failedReceipts = Object.values(receipts).filter(receipt => receipt.status === "error");
+        const receiptValues = ticketIds.map(id => receipts[id]).filter(Boolean);
+        const failedReceipts = receiptValues.filter(receipt => receipt.status === "error");
+        receiptsPending = receiptValues.length < ticketIds.length;
         if (failedReceipts.length) receiptError = failedReceipts.map(receipt => receipt.details?.error ?? receipt.message ?? "Expo receipt failed").join("; ");
       } catch (error) {
+        receiptsPending = true;
         receiptError = error instanceof Error ? error.message : "Expo receipt request failed";
       }
     }
     const { error: deliveryUpdateError } = await admin.from("notification_delivery_log").update({
-      status: accepted && !receiptError ? "sent" : "failed",
+      status: accepted === 0 ? "failed" : receiptError && !receiptsPending ? "failed" : receiptsPending ? "pending" : "sent",
       provider_ticket_id: results.find(result => result.id)?.id ?? null,
-      provider_receipt_status: receiptError ? "error" : accepted ? "ok" : "rejected",
-      delivered_at: accepted && !receiptError ? new Date().toISOString() : null,
+      provider_receipt_status: receiptError && !receiptsPending ? "error" : receiptsPending ? "pending" : accepted ? "ok" : "rejected",
+      delivered_at: accepted && !receiptError && !receiptsPending ? new Date().toISOString() : null,
       error_message: [receiptError, ...results.filter(result => result.details?.error).map(result => result.details?.error)].filter(Boolean).join("; ") || null,
     }).eq("user_id", authData.user.id).eq("notification_type", "general_tip").eq("delivery_key", deliveryKey);
     if (deliveryUpdateError) throw deliveryUpdateError;
     return new Response(JSON.stringify({
-      status: accepted && !receiptError ? "sent" : "failed",
+      status: accepted === 0 ? "failed" : receiptError && !receiptsPending ? "failed" : receiptsPending ? "pending" : "sent",
       deviceCount: devices.length,
       results: results.map(result => ({ status: result.status, ticketId: result.id, error: result.details?.error })),
-    }), { status: accepted && !receiptError ? 200 : 502, headers });
+    }), { status: accepted && !receiptError && !receiptsPending ? 200 : 502, headers });
   } catch (error) {
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Notification test failed" }), { status: 500, headers });
   }
