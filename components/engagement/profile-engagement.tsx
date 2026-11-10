@@ -12,6 +12,8 @@ import {
   getNotificationPermissionStatus,
   registerAndroidPushToken,
   requestAndroidNotificationPermission,
+  scheduleLocalNotification,
+  sendTestNotification,
   type NotificationPermissionStatus,
 } from "@/services/notifications";
 import type { Tables } from "@/types/database.types";
@@ -43,10 +45,9 @@ const defaultPreferences: Preferences = {
   general_tips_enabled: true,
   streak_reminders_enabled: true,
   inactivity_reminders_enabled: true,
-  notification_frequency: "daily",
+  reminder_frequency: "daily",
   quiet_hours_start: "21:00",
   quiet_hours_end: "07:00",
-  permission_status: "unknown",
 };
 
 async function readSeenBadges(userId: string): Promise<string[]> {
@@ -97,6 +98,13 @@ export function ProfileEngagement() {
       if (preferencesError) setSettingsError("Notification settings could not be loaded.");
       setPreferences(data ?? { ...defaultPreferences, user_id: user.id });
       setPermission(permissionStatus);
+      if (permissionStatus === "granted") {
+        try {
+          await registerAndroidPushToken(user.id);
+        } catch {
+          if (active) setSettingsError("This device could not be registered for notifications.");
+        }
+      }
     })();
     return () => { active = false; };
   }, [user]);
@@ -118,7 +126,7 @@ export function ProfileEngagement() {
 
   async function updatePreferences(patch: Partial<Preferences>) {
     if (!user || !preferences) return;
-    const next = { ...preferences, ...patch };
+    const next = { ...preferences, ...patch, updated_at: new Date().toISOString() };
     setPreferences(next);
     const { error: updateError } = await supabase.from("notification_preferences").upsert(next);
     if (updateError) {
@@ -131,13 +139,26 @@ export function ProfileEngagement() {
     setSettingsError("");
     const status = await requestAndroidNotificationPermission();
     setPermission(status);
-    await updatePreferences({ permission_status: status });
     if (status === "granted" && user) {
       try {
         await registerAndroidPushToken(user.id);
       } catch {
         setSettingsError("Permission was granted, but this device could not be registered.");
       }
+    }
+  }
+
+  async function runNotificationTest(local: boolean) {
+    setSettingsError("");
+    try {
+      if (local) {
+        await scheduleLocalNotification();
+      } else {
+        const result = await sendTestNotification();
+        if (result.status === "no_devices") throw new Error("No registered Android device was found.");
+      }
+    } catch (value) {
+      setSettingsError(value instanceof Error ? value.message : "The notification test failed.");
     }
   }
 
@@ -190,7 +211,7 @@ export function ProfileEngagement() {
       </View>
 
       <View style={styles.tipCard}>
-        <View style={styles.sectionHeader}><Text style={styles.cardTitle}>Daily financial tip</Text><Pressable accessibilityLabel="Refresh financial tip" onPress={() => void refresh()}><Ionicons name="refresh-outline" size={18} color={palette.purple} /></Pressable></View>
+        <View style={styles.sectionHeader}><Text style={styles.cardTitle}>{tip?.title ?? "Daily financial tip"}</Text><Pressable accessibilityLabel="Refresh financial tip" onPress={() => void refresh()}><Ionicons name="refresh-outline" size={18} color={palette.purple} /></Pressable></View>
         <Text style={styles.tipText}>{isLoading ? "Finding a useful tip..." : tip?.text ?? "Keep building one practical money habit at a time."}</Text>
         {tip?.personalised ? <Text style={styles.personalised}>Based on your budget</Text> : null}
       </View>
@@ -199,11 +220,15 @@ export function ProfileEngagement() {
       {Platform.OS === "android" ? (
         <View style={styles.settingsCard}>
           <View style={styles.permissionRow}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>Android notifications</Text><Text style={commonStyles.label}>Permission: {permission}</Text></View><Pressable accessibilityRole="button" onPress={() => void enableNotifications()}><Text style={styles.actionText}>{permission === "granted" ? "Refresh" : "Enable"}</Text></Pressable></View>
+          <View style={styles.testActions}>
+            <Pressable accessibilityRole="button" onPress={() => void runNotificationTest(true)}><Text style={styles.actionText}>Test locally</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={() => void runNotificationTest(false)}><Text style={styles.actionText}>Test push</Text></Pressable>
+          </View>
           <SettingRow label="Budget tips" value={preferences?.budget_tips_enabled ?? true} onChange={value => void updatePreferences({ budget_tips_enabled: value })} />
           <SettingRow label="General tips" value={preferences?.general_tips_enabled ?? true} onChange={value => void updatePreferences({ general_tips_enabled: value })} />
           <SettingRow label="Streak reminders" value={preferences?.streak_reminders_enabled ?? true} onChange={value => void updatePreferences({ streak_reminders_enabled: value })} />
           <SettingRow label="Inactivity reminders" value={preferences?.inactivity_reminders_enabled ?? true} onChange={value => void updatePreferences({ inactivity_reminders_enabled: value })} />
-          <ChoiceRow label="Reminder frequency" value={preferences?.notification_frequency ?? "daily"} options={["daily", "weekly"]} onChange={value => void updatePreferences({ notification_frequency: value })} />
+          <ChoiceRow label="Reminder frequency" value={preferences?.reminder_frequency ?? "daily"} options={["daily", "every_2_days", "weekly", "off"]} onChange={value => void updatePreferences({ reminder_frequency: value })} />
           <ChoiceRow label="Reminder time" value={(preferences?.reminder_time ?? "18:00").slice(0, 5)} options={["08:00", "12:00", "18:00", "20:00"]} onChange={value => void updatePreferences({ reminder_time: value })} />
           <ChoiceRow label="Quiet hours" value={`${(preferences?.quiet_hours_start ?? "21:00").slice(0, 5)}–${(preferences?.quiet_hours_end ?? "07:00").slice(0, 5)}`} options={["21:00–07:00", "22:00–06:00", "23:00–06:00"]} onChange={value => { const [start, end] = value.split("–"); void updatePreferences({ quiet_hours_start: start, quiet_hours_end: end }); }} />
         </View>
@@ -272,6 +297,7 @@ const useStyles = themedStyles(palette => ({
   settingsCard: { padding: spacing.md, borderRadius: radii.md, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.line, gap: spacing.sm },
   permissionRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xs },
   settingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: spacing.xs },
+  testActions: { flexDirection: "row", gap: spacing.md, paddingVertical: spacing.xs },
   actionText: { color: palette.purple, fontSize: 13, fontWeight: "600" },
   error: { color: palette.error, fontSize: 12 },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.42)", justifyContent: "center", alignItems: "center", padding: spacing.lg },

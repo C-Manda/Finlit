@@ -577,27 +577,30 @@ export type Database = {
       financial_tips: {
         Row: {
           category: string
+          code: string
           created_at: string
           id: string
           is_active: boolean
-          sort_order: number
-          tip_text: string
+          title: string
+          body: string
         }
         Insert: {
           category: string
+          code: string
           created_at?: string
           id?: string
           is_active?: boolean
-          sort_order?: number
-          tip_text: string
+          title: string
+          body: string
         }
         Update: {
           category?: string
+          code?: string
           created_at?: string
           id?: string
           is_active?: boolean
-          sort_order?: number
-          tip_text?: string
+          title?: string
+          body?: string
         }
         Relationships: []
       }
@@ -915,8 +918,7 @@ export type Database = {
           general_tips_enabled: boolean
           inactivity_reminders_enabled: boolean
           inactivity_days: number
-          notification_frequency: string
-          permission_status: string
+          reminder_frequency: string
           reminder_time: string
           reminders_enabled: boolean
           quiet_hours_end: string
@@ -931,8 +933,7 @@ export type Database = {
           general_tips_enabled?: boolean
           inactivity_reminders_enabled?: boolean
           inactivity_days?: number
-          notification_frequency?: string
-          permission_status?: string
+          reminder_frequency?: string
           reminder_time?: string
           reminders_enabled?: boolean
           quiet_hours_end?: string
@@ -947,8 +948,7 @@ export type Database = {
           general_tips_enabled?: boolean
           inactivity_reminders_enabled?: boolean
           inactivity_days?: number
-          notification_frequency?: string
-          permission_status?: string
+          reminder_frequency?: string
           reminder_time?: string
           reminders_enabled?: boolean
           quiet_hours_end?: string
@@ -1051,6 +1051,7 @@ export type Database = {
           id: string
           is_enabled: boolean
           last_seen_at: string
+          platform: string
           user_id: string
         }
         Insert: {
@@ -1059,6 +1060,7 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           last_seen_at?: string
+          platform: string
           user_id: string
         }
         Update: {
@@ -1067,46 +1069,53 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           last_seen_at?: string
+          platform?: string
           user_id?: string
         }
         Relationships: []
       }
       notification_delivery_log: {
         Row: {
-          category: string
           created_at: string
           delivered_at: string | null
-          device_id: string | null
+          delivery_key: string
           error_message: string | null
           id: string
-          notification_key: string
-          provider_ticket: string | null
+          last_attempt_at: string | null
+          notification_type: string
+          attempt_count: number
+          provider_receipt_status: string | null
+          provider_ticket_id: string | null
           scheduled_for: string
           status: string
           user_id: string
         }
         Insert: {
-          category: string
           created_at?: string
           delivered_at?: string | null
-          device_id?: string | null
+          delivery_key: string
           error_message?: string | null
           id?: string
-          notification_key: string
-          provider_ticket?: string | null
+          last_attempt_at?: string | null
+          notification_type: string
+          attempt_count?: number
+          provider_receipt_status?: string | null
+          provider_ticket_id?: string | null
           scheduled_for: string
           status?: string
           user_id: string
         }
         Update: {
-          category?: string
           created_at?: string
           delivered_at?: string | null
-          device_id?: string | null
+          delivery_key?: string
           error_message?: string | null
           id?: string
-          notification_key?: string
-          provider_ticket?: string | null
+          last_attempt_at?: string | null
+          notification_type?: string
+          attempt_count?: number
+          provider_receipt_status?: string | null
+          provider_ticket_id?: string | null
           scheduled_for?: string
           status?: string
           user_id?: string

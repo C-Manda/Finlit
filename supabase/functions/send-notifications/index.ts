@@ -1,66 +1,140 @@
 import { admin, inQuietHours, markInvalidToken, sendExpoMessages } from "../_shared/push.ts";
 
 const headers = { "Content-Type": "application/json" };
+const types = ["budget_tip", "general_tip", "streak_reminder", "inactivity_reminder"] as const;
+type NotificationType = typeof types[number];
+
+function isNotificationType(value: string): value is NotificationType {
+  return types.includes(value as NotificationType);
+}
 
 Deno.serve(async request => {
   const secret = Deno.env.get("NOTIFICATION_DISPATCH_SECRET");
   if (!secret || request.headers.get("x-notification-secret") !== secret) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
   }
+
   try {
     const input = await request.json() as {
       userId: string;
-      category: "budget" | "general" | "streak" | "inactivity";
-      notificationKey: string;
+      notificationType: NotificationType;
+      deliveryKey: string;
+      scheduledFor: string;
       title: string;
       body: string;
     };
-    if (!input.userId || !input.notificationKey || !input.title || !input.body) {
-      return new Response(JSON.stringify({ error: "Missing notification fields" }), { status: 400, headers });
+    if (!input.userId || !isNotificationType(input.notificationType) || !input.deliveryKey ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(input.scheduledFor) || !input.title || !input.body) {
+      return new Response(JSON.stringify({ error: "Invalid notification fields" }), { status: 400, headers });
     }
 
     const { data: preferences, error: preferencesError } = await admin
       .from("notification_preferences").select("*").eq("user_id", input.userId).maybeSingle();
     if (preferencesError) throw preferencesError;
-    if (!preferences?.reminders_enabled) return new Response(JSON.stringify({ skipped: "disabled" }), { headers });
-    const enabled = input.category === "budget" ? preferences.budget_tips_enabled
-      : input.category === "general" ? preferences.general_tips_enabled
-        : input.category === "streak" ? preferences.streak_reminders_enabled
+    if (!preferences?.reminders_enabled || preferences.reminder_frequency === "off") {
+      return new Response(JSON.stringify({ status: "skipped", reason: "disabled" }), { headers });
+    }
+    const categoryEnabled = input.notificationType === "budget_tip"
+      ? preferences.budget_tips_enabled
+      : input.notificationType === "general_tip"
+        ? preferences.general_tips_enabled
+        : input.notificationType === "streak_reminder"
+          ? preferences.streak_reminders_enabled
           : preferences.inactivity_reminders_enabled;
-    if (!enabled || inQuietHours(preferences.timezone, preferences.quiet_hours_start, preferences.quiet_hours_end)) {
-      return new Response(JSON.stringify({ skipped: "preference" }), { headers });
+    if (!categoryEnabled || inQuietHours(preferences.timezone, preferences.quiet_hours_start, preferences.quiet_hours_end)) {
+      return new Response(JSON.stringify({ status: "skipped", reason: "preference" }), { headers });
     }
 
-    const scheduledFor = new Date().toISOString();
     const { data: devices, error: devicesError } = await admin
-      .from("push_devices").select("id, expo_push_token").eq("user_id", input.userId).eq("is_enabled", true);
+      .from("push_devices").select("id, expo_push_token")
+      .eq("user_id", input.userId).eq("platform", "android").eq("is_enabled", true);
     if (devicesError) throw devicesError;
-    const sent: string[] = [];
-    for (const device of devices ?? []) {
-      const { error: logError } = await admin.from("notification_delivery_log").insert({
-        user_id: input.userId, device_id: device.id, notification_key: input.notificationKey,
-        category: input.category, scheduled_for: scheduledFor,
-      });
-      if (logError?.code === "23505") continue;
-      if (logError) throw logError;
-      const [result] = await sendExpoMessages([{
-        to: device.expo_push_token, title: input.title, body: input.body,
-        data: { category: input.category }, channelId: "finlit-engagement",
-      }]);
+    if (!devices?.length) return new Response(JSON.stringify({ status: "no_devices" }), { headers });
+
+    const { data: existing, error: existingError } = await admin
+      .from("notification_delivery_log").select("status, attempt_count, last_attempt_at")
+      .eq("user_id", input.userId).eq("notification_type", input.notificationType)
+      .eq("delivery_key", input.deliveryKey).maybeSingle();
+    if (existingError) throw existingError;
+    if (existing?.status === "sent") return new Response(JSON.stringify({ status: "already_sent" }), { headers });
+    if (existing?.status === "pending" && existing.last_attempt_at &&
+        Date.now() - Date.parse(existing.last_attempt_at) < 10 * 60 * 1000) {
+      return new Response(JSON.stringify({ status: "already_claimed" }), { headers });
+    }
+    const now = new Date().toISOString();
+    let claimed = false;
+    let claimError;
+    if (existing) {
+      const claim = await admin.from("notification_delivery_log").update({
+        status: "pending",
+        attempt_count: (existing.attempt_count ?? 0) + 1,
+        last_attempt_at: now,
+        error_message: null,
+      }).eq("user_id", input.userId).eq("notification_type", input.notificationType)
+        .eq("delivery_key", input.deliveryKey)
+        .or(`status.eq.failed,and(status.eq.pending,last_attempt_at.lt.${new Date(Date.now() - 10 * 60 * 1000).toISOString()})`)
+        .select("id");
+      claimError = claim.error;
+      claimed = Boolean(claim.data?.length);
+    } else {
+      const claim = await admin.from("notification_delivery_log").insert({
+        user_id: input.userId,
+        notification_type: input.notificationType,
+        delivery_key: input.deliveryKey,
+        scheduled_for: input.scheduledFor,
+        status: "pending",
+        attempt_count: 1,
+        last_attempt_at: now,
+      }).select("id");
+      claimError = claim.error;
+      claimed = Boolean(claim.data?.length);
+    }
+    if (claimError?.code === "23505") {
+      return new Response(JSON.stringify({ status: "already_claimed" }), { headers });
+    }
+    if (claimError) throw claimError;
+    if (!claimed) return new Response(JSON.stringify({ status: "already_claimed" }), { headers });
+
+    let results;
+    try {
+      results = await sendExpoMessages(devices.map(device => ({
+        to: device.expo_push_token,
+        title: input.title,
+        body: input.body,
+        data: { notificationType: input.notificationType, deliveryKey: input.deliveryKey },
+        channelId: "finlit-engagement",
+      })));
+    } catch (error) {
+      await admin.from("notification_delivery_log").update({
+        status: "failed",
+        error_message: error instanceof Error ? error.message : "Expo request failed",
+      }).eq("user_id", input.userId).eq("notification_type", input.notificationType)
+        .eq("delivery_key", input.deliveryKey);
+      throw error;
+    }
+    let accepted = 0;
+    const errors: string[] = [];
+    for (let index = 0; index < devices.length; index += 1) {
+      const result = results[index];
       if (result?.status === "ok") {
-        sent.push(device.id);
-        await admin.from("notification_delivery_log").update({
-          status: "sent", provider_ticket: result.id, delivered_at: new Date().toISOString(),
-        }).eq("user_id", input.userId).eq("device_id", device.id).eq("notification_key", input.notificationKey).eq("scheduled_for", scheduledFor);
+        accepted += 1;
       } else {
-        const invalid = result?.details?.error === "DeviceNotRegistered" || result?.details?.error === "InvalidCredentials";
-        if (invalid) await markInvalidToken(device.expo_push_token);
-        await admin.from("notification_delivery_log").update({
-          status: "failed", error_message: result?.details?.error ?? "Expo rejected notification",
-        }).eq("user_id", input.userId).eq("device_id", device.id).eq("notification_key", input.notificationKey).eq("scheduled_for", scheduledFor);
+        const reason = result?.details?.error ?? "Expo rejected notification";
+        errors.push(reason);
+        if (reason === "DeviceNotRegistered" || reason === "InvalidCredentials") {
+          await markInvalidToken(devices[index].expo_push_token);
+        }
       }
     }
-    return new Response(JSON.stringify({ sent }), { headers });
+    const finalStatus = accepted > 0 ? "sent" : "failed";
+    await admin.from("notification_delivery_log").update({
+      status: finalStatus,
+      provider_ticket_id: results.find(result => result?.id)?.id ?? null,
+      provider_receipt_status: accepted > 0 ? "accepted" : "rejected",
+      delivered_at: accepted > 0 ? new Date().toISOString() : null,
+      error_message: errors.length ? errors.join("; ") : null,
+    }).eq("user_id", input.userId).eq("notification_type", input.notificationType).eq("delivery_key", input.deliveryKey);
+    return new Response(JSON.stringify({ status: finalStatus, accepted, failed: devices.length - accepted }), { headers });
   } catch (error) {
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Notification delivery failed" }), { status: 500, headers });
   }

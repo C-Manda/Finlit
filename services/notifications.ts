@@ -51,15 +51,40 @@ export async function registerAndroidPushToken(userId: string): Promise<Notifica
   if (!projectId) throw new Error("Missing EAS project ID for Android push registration.");
   const token = (await notifications.getExpoPushTokenAsync({ projectId })).data;
   const { error } = await supabase.from("push_devices").upsert(
-    { user_id: userId, expo_push_token: token, is_enabled: true, last_seen_at: new Date().toISOString() },
+    { user_id: userId, expo_push_token: token, platform: "android", is_enabled: true, last_seen_at: new Date().toISOString() },
     { onConflict: "expo_push_token" },
   );
   if (error) throw error;
   return status;
 }
 
+export async function scheduleLocalNotification() {
+  const notifications = await getNotifications();
+  if (!notifications) return "unsupported" as const;
+  const status = await getNotificationPermissionStatus();
+  if (status !== "granted") return status;
+  await notifications.scheduleNotificationAsync({
+    content: {
+      title: "FinLit notification test",
+      body: "Local Android notifications are configured.",
+      data: { source: "local-test" },
+    },
+    trigger: null,
+  });
+  return status;
+}
+
+export async function sendTestNotification() {
+  if (Platform.OS !== "android") return { status: "unsupported" as const };
+  const { data, error } = await supabase.functions.invoke("test-notification", {
+    body: {},
+  });
+  if (error) throw error;
+  return data as { status: "sent" | "no_devices"; deviceCount?: number; results?: string[] };
+}
+
 export async function disableAndroidPushTokens(userId: string) {
   if (Platform.OS !== "android") return;
-  const { error } = await supabase.from("push_devices").update({ is_enabled: false }).eq("user_id", userId);
+  const { error } = await supabase.from("push_devices").update({ is_enabled: false }).eq("user_id", userId).eq("platform", "android");
   if (error) throw error;
 }

@@ -13,6 +13,11 @@ type PushMessage = {
   data: Record<string, string>;
   channelId: string;
 };
+export type ExpoPushResult = {
+  status?: string;
+  id?: string;
+  details?: { error?: string };
+};
 
 export function inQuietHours(timezone: string, start: string, end: string, now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(now);
@@ -34,7 +39,7 @@ export async function sendExpoMessages(messages: PushMessage[]) {
     body: JSON.stringify(messages),
   });
   if (!response.ok) throw new Error(`Expo push request failed with ${response.status}`);
-  const payload = await response.json() as { data?: Array<{ status?: string; id?: string; details?: { error?: string } }> };
+  const payload = await response.json() as { data?: ExpoPushResult[] };
   return payload.data ?? [];
 }
 

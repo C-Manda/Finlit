@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 export type FinancialTip = {
   id: string;
   category: string;
+  title: string;
   text: string;
   personalised: boolean;
 };
@@ -20,9 +21,9 @@ function allocations(value: Json): AllocationMap {
 export async function getDailyFinancialTip(userId: string, previousTip?: string): Promise<FinancialTip> {
   const { data: tips, error: tipsError } = await supabase
     .from("financial_tips")
-    .select("id, category, tip_text")
+    .select("id, category, title, body")
     .eq("is_active", true)
-    .order("sort_order", { ascending: true });
+    .order("created_at", { ascending: true });
   if (tipsError) throw tipsError;
 
   const { data: plans, error: plansError } = await supabase
@@ -52,19 +53,19 @@ export async function getDailyFinancialTip(userId: string, previousTip?: string)
         if (entry.category_id) spent.set(entry.category_id, (spent.get(entry.category_id) ?? 0) + entry.amount);
       }
       if ([...spent].some(([id, amount]) => amount > (categoryAllocations[id] ?? 0))) {
-        return { id: "budget-review", category: "budgeting", text: "One of your planned categories needs a review. Check your budget before making the next purchase.", personalised: true };
+        return { id: "budget-review", category: "budgeting", title: "Budget review", text: "One of your planned categories needs a review. Check your budget before making the next purchase.", personalised: true };
       }
       if ([...spent].some(([id, amount]) => amount >= (categoryAllocations[id] ?? 0) * 0.8)) {
-        return { id: "budget-near-limit", category: "budgeting", text: "You are getting close to a planned category limit. A quick review can help you stay intentional.", personalised: true };
+        return { id: "budget-near-limit", category: "budgeting", title: "Budget check-in", text: "You are getting close to a planned category limit. A quick review can help you stay intentional.", personalised: true };
       }
     }
   }
 
-  const available = (tips ?? []).filter(tip => tip.tip_text !== previousTip);
+  const available = (tips ?? []).filter(tip => tip.body !== previousTip);
   const list = available.length > 0 ? available : tips ?? [];
   const selected = list[Math.floor(new Date().getDate() % Math.max(list.length, 1))];
   if (!selected) {
-    return { id: "fallback", category: "general", text: "Keep building one practical money habit at a time.", personalised: false };
+    return { id: "fallback", category: "general", title: "Daily tip", text: "Keep building one practical money habit at a time.", personalised: false };
   }
-  return { id: selected.id, category: selected.category, text: selected.tip_text, personalised: false };
+  return { id: selected.id, category: selected.category, title: selected.title, text: selected.body, personalised: false };
 }
