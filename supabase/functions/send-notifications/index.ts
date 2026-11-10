@@ -1,4 +1,4 @@
-import { admin, inQuietHours, markInvalidToken, sendExpoMessages } from "../_shared/push.ts";
+import { admin, getExpoReceipts, inQuietHours, markInvalidToken, sendExpoMessages } from "../_shared/push.ts";
 
 const headers = { "Content-Type": "application/json" };
 const types = ["budget_tip", "general_tip", "streak_reminder", "inactivity_reminder"] as const;
@@ -105,11 +105,12 @@ Deno.serve(async request => {
         channelId: "finlit-engagement",
       })));
     } catch (error) {
-      await admin.from("notification_delivery_log").update({
+      const { error: failedUpdateError } = await admin.from("notification_delivery_log").update({
         status: "failed",
         error_message: error instanceof Error ? error.message : "Expo request failed",
       }).eq("user_id", input.userId).eq("notification_type", input.notificationType)
         .eq("delivery_key", input.deliveryKey);
+      if (failedUpdateError) throw failedUpdateError;
       throw error;
     }
     let accepted = 0;
@@ -122,18 +123,38 @@ Deno.serve(async request => {
         const reason = result?.details?.error ?? "Expo rejected notification";
         errors.push(reason);
         if (reason === "DeviceNotRegistered" || reason === "InvalidCredentials") {
-          await markInvalidToken(devices[index].expo_push_token);
+          try {
+            await markInvalidToken(devices[index].expo_push_token);
+          } catch (error) {
+            errors.push(error instanceof Error ? error.message : "Could not disable invalid token");
+          }
         }
       }
     }
-    const finalStatus = accepted > 0 ? "sent" : "failed";
-    await admin.from("notification_delivery_log").update({
+    const ticketIds = results.flatMap(result => result?.id ? [result.id] : []);
+    let receiptError: string | null = null;
+    if (ticketIds.length) {
+      try {
+        const receipts = await getExpoReceipts(ticketIds);
+        const receiptValues = ticketIds.map(id => receipts[id]).filter(Boolean);
+        const receiptFailures = receiptValues.filter(receipt => receipt.status === "error");
+        if (receiptFailures.length) {
+          receiptError = receiptFailures.map(receipt => receipt.details?.error ?? receipt.message ?? "Expo receipt failed").join("; ");
+          errors.push(receiptError);
+        }
+      } catch (error) {
+        receiptError = error instanceof Error ? error.message : "Expo receipt request failed";
+      }
+    }
+    const finalStatus = accepted > 0 && !receiptError ? "sent" : "failed";
+    const { error: deliveryUpdateError } = await admin.from("notification_delivery_log").update({
       status: finalStatus,
       provider_ticket_id: results.find(result => result?.id)?.id ?? null,
-      provider_receipt_status: accepted > 0 ? "accepted" : "rejected",
-      delivered_at: accepted > 0 ? new Date().toISOString() : null,
+      provider_receipt_status: receiptError ? "error" : accepted > 0 ? "ok" : "rejected",
+      delivered_at: finalStatus === "sent" ? new Date().toISOString() : null,
       error_message: errors.length ? errors.join("; ") : null,
     }).eq("user_id", input.userId).eq("notification_type", input.notificationType).eq("delivery_key", input.deliveryKey);
+    if (deliveryUpdateError) throw deliveryUpdateError;
     return new Response(JSON.stringify({ status: finalStatus, accepted, failed: devices.length - accepted }), { headers });
   } catch (error) {
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Notification delivery failed" }), { status: 500, headers });

@@ -1,0 +1,22 @@
+name: Dispatch FinLit engagement notifications
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke scheduled engagement function
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          ENGAGEMENT_CRON_SECRET: ${{ secrets.ENGAGEMENT_CRON_SECRET }}
+        run: |
+          test -n "$SUPABASE_URL"
+          test -n "$ENGAGEMENT_CRON_SECRET"
+          curl --fail-with-body --silent --show-error \
+            -X POST "$SUPABASE_URL/functions/v1/scheduled-engagement" \
+            -H "x-cron-secret: $ENGAGEMENT_CRON_SECRET" \
+            -H "Content-Type: application/json"

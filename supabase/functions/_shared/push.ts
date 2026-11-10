@@ -18,6 +18,7 @@ export type ExpoPushResult = {
   id?: string;
   details?: { error?: string };
 };
+export type ExpoReceipt = { status?: string; message?: string; details?: { error?: string } };
 
 export function inQuietHours(timezone: string, start: string, end: string, now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(now);
@@ -43,6 +44,19 @@ export async function sendExpoMessages(messages: PushMessage[]) {
   return payload.data ?? [];
 }
 
+export async function getExpoReceipts(ticketIds: string[]) {
+  if (!ticketIds.length) return {};
+  const response = await fetch("https://exp.host/--/api/v2/push/getReceipts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ ids: ticketIds }),
+  });
+  if (!response.ok) throw new Error(`Expo receipt request failed with ${response.status}`);
+  const payload = await response.json() as { data?: Record<string, ExpoReceipt> };
+  return payload.data ?? {};
+}
+
 export async function markInvalidToken(token: string) {
-  await admin.from("push_devices").update({ is_enabled: false }).eq("expo_push_token", token);
+  const { error } = await admin.from("push_devices").update({ is_enabled: false }).eq("expo_push_token", token);
+  if (error) throw error;
 }

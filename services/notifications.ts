@@ -50,10 +50,10 @@ export async function registerAndroidPushToken(userId: string): Promise<Notifica
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;
   if (!projectId) throw new Error("Missing EAS project ID for Android push registration.");
   const token = (await notifications.getExpoPushTokenAsync({ projectId })).data;
-  const { error } = await supabase.from("push_devices").upsert(
-    { user_id: userId, expo_push_token: token, platform: "android", is_enabled: true, last_seen_at: new Date().toISOString() },
-    { onConflict: "expo_push_token" },
-  );
+  const { error } = await supabase.from("push_devices").upsert({
+    user_id: userId, expo_push_token: token, platform: "android", is_enabled: true,
+    last_seen_at: new Date().toISOString(),
+  }, { onConflict: "user_id,expo_push_token" });
   if (error) throw error;
   return status;
 }

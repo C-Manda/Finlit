@@ -2,6 +2,22 @@ import { admin, inQuietHours } from "../_shared/push.ts";
 
 const headers = { "Content-Type": "application/json" };
 
+async function dispatch(input: {
+  userId: string; notificationType: string; deliveryKey: string; scheduledFor: string;
+  title: string; body: string;
+}) {
+  const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-notifications`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-notification-secret": Deno.env.get("NOTIFICATION_DISPATCH_SECRET") ?? "",
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(`Dispatch failed with ${response.status}`);
+  return response.json() as Promise<{ status?: string }>;
+}
+
 Deno.serve(async request => {
   const expected = Deno.env.get("ENGAGEMENT_CRON_SECRET");
   if (!expected || request.headers.get("x-cron-secret") !== expected) {
@@ -39,28 +55,45 @@ Deno.serve(async request => {
       const inactiveDays = streak?.last_active_on
         ? Math.floor((Date.parse(`${localDate}T00:00:00Z`) - Date.parse(`${streak.last_active_on}T00:00:00Z`)) / 86400000)
         : preference.inactivity_days;
-      const notificationType = inactiveDays >= preference.inactivity_days
-        ? "inactivity_reminder"
-        : "streak_reminder";
-      if (notificationType === "inactivity_reminder" && !preference.inactivity_reminders_enabled) continue;
-      if (notificationType === "streak_reminder" && (!preference.streak_reminders_enabled || streak?.last_active_on === localDate)) continue;
-      const deliveryKey = `${notificationType}:${localDate}`;
-      const dispatchResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-notifications`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-notification-secret": Deno.env.get("NOTIFICATION_DISPATCH_SECRET") ?? "" },
-        body: JSON.stringify({
+      const needsInactivityReminder = inactiveDays >= preference.inactivity_days;
+      const canSendReminder = needsInactivityReminder
+        ? preference.inactivity_reminders_enabled
+        : preference.streak_reminders_enabled && streak?.last_active_on !== localDate;
+      if (canSendReminder) {
+        const notificationType = needsInactivityReminder ? "inactivity_reminder" : "streak_reminder";
+        const result = await dispatch({
           userId: preference.user_id,
           notificationType,
-          deliveryKey,
+          deliveryKey: `${notificationType}:${localDate}`,
           scheduledFor: localDate,
-          title: notificationType === "inactivity_reminder" ? "FinLit is ready when you are" : "Keep your FinLit streak going",
-          body: notificationType === "inactivity_reminder"
+          title: needsInactivityReminder ? "FinLit is ready when you are" : "Keep your FinLit streak going",
+          body: needsInactivityReminder
             ? "Take a few minutes to return to a lesson or review a money habit."
             : "Complete one meaningful activity today to keep learning.",
-        }),
+        });
+        if (result.status !== "skipped" && result.status !== "no_devices") attempted += 1;
+        continue;
+      }
+
+      const tipCategory = dayNumber % 2 === 0 && preference.budget_tips_enabled ? "budgeting" : null;
+      if (!preference.general_tips_enabled && !tipCategory) continue;
+      const { data: tips, error: tipsError } = await admin.from("financial_tips")
+        .select("id, category, title, body").eq("is_active", true);
+      if (tipsError) throw tipsError;
+      const availableTips = (tips ?? []).filter(tip =>
+        tipCategory ? tip.category === tipCategory : tip.category !== "budgeting");
+      if (!availableTips.length) continue;
+      const tip = availableTips[dayNumber % availableTips.length];
+      const notificationType = tip.category === "budgeting" ? "budget_tip" : "general_tip";
+      const result = await dispatch({
+        userId: preference.user_id,
+        notificationType,
+        deliveryKey: `${notificationType}:${localDate}:${tip.id}`,
+        scheduledFor: localDate,
+        title: tip.title,
+        body: tip.body,
       });
-      if (!dispatchResponse.ok) throw new Error(`Dispatch failed with ${dispatchResponse.status}`);
-      attempted += 1;
+      if (result.status !== "skipped" && result.status !== "no_devices") attempted += 1;
     }
     return new Response(JSON.stringify({ attempted }), { headers });
   } catch (error) {
