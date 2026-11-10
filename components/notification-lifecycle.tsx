@@ -1,6 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import { getNotificationPermissionStatus, registerAndroidPushToken } from "@/services/notifications";
+import {
+  getNotificationPermissionStatus,
+  registerAndroidPushToken,
+  scheduleDailyReminder,
+} from "@/services/notifications";
 
 export function NotificationLifecycle() {
   const { user, isLoading } = useAuth();
@@ -14,8 +18,11 @@ export function NotificationLifecycle() {
     if (registeredUser.current === user.id) return;
     let active = true;
     void getNotificationPermissionStatus()
-      .then(status => {
-        if (active && status === "granted") return registerAndroidPushToken(user.id);
+      .then(async status => {
+        if (active && status === "granted") {
+          await registerAndroidPushToken(user.id);
+          await scheduleDailyReminder(user.id);
+        }
         return status;
       })
       .then(() => {

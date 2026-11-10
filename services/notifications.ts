@@ -1,11 +1,13 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { supabase } from "@/lib/supabase";
 
 export type NotificationPermissionStatus = "granted" | "denied" | "undetermined" | "unsupported";
 
 type ExpoNotificationsModule = typeof import("expo-notifications");
 let configured = false;
+const dailyReminderKey = (userId: string) => `finlit-daily-reminder-${userId}`;
 
 async function getNotifications(): Promise<ExpoNotificationsModule | null> {
   if (Platform.OS !== "android") return null;
@@ -45,7 +47,9 @@ export async function registerAndroidPushToken(userId: string): Promise<Notifica
   if (status !== "granted") return status;
   await notifications.setNotificationChannelAsync("finlit-engagement", {
     name: "FinLit engagement",
-    importance: notifications.AndroidImportance.DEFAULT,
+    importance: notifications.AndroidImportance.HIGH,
+    sound: "default",
+    vibrationPattern: [0, 250, 250, 250],
   });
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;
   if (!projectId) throw new Error("Missing EAS project ID for Android push registration.");
@@ -72,6 +76,44 @@ export async function scheduleLocalNotification() {
     trigger: null,
   });
   return status;
+}
+
+export async function scheduleDailyReminder(userId: string) {
+  const notifications = await getNotifications();
+  if (!notifications) return "unsupported" as const;
+  const status = await getNotificationPermissionStatus();
+  if (status !== "granted") return status;
+  await notifications.setNotificationChannelAsync("finlit-engagement", {
+    name: "FinLit engagement",
+    importance: notifications.AndroidImportance.HIGH,
+    sound: "default",
+  });
+  const storedId = await SecureStore.getItemAsync(dailyReminderKey(userId));
+  const scheduled = await notifications.getAllScheduledNotificationsAsync();
+  if (storedId && scheduled.some(item => item.identifier === storedId)) return status;
+  const identifier = await notifications.scheduleNotificationAsync({
+    content: {
+      title: "Your FinLit journey is waiting",
+      body: "Open FinLit and keep building better money habits.",
+      sound: "default",
+      data: { source: "daily-reminder" },
+    },
+    trigger: {
+      type: notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 24 * 60 * 60,
+      repeats: false,
+    },
+  });
+  await SecureStore.setItemAsync(dailyReminderKey(userId), identifier);
+  return status;
+}
+
+export async function cancelDailyReminder(userId: string) {
+  const notifications = await getNotifications();
+  if (!notifications) return;
+  const storedId = await SecureStore.getItemAsync(dailyReminderKey(userId));
+  if (storedId) await notifications.cancelScheduledNotificationAsync(storedId);
+  await SecureStore.deleteItemAsync(dailyReminderKey(userId));
 }
 
 export async function sendTestNotification() {

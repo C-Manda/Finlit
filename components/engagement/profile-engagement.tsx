@@ -12,6 +12,7 @@ import {
   getNotificationPermissionStatus,
   registerAndroidPushToken,
   requestAndroidNotificationPermission,
+  scheduleDailyReminder,
   scheduleLocalNotification,
   sendTestNotification,
   type NotificationPermissionStatus,
@@ -101,6 +102,7 @@ export function ProfileEngagement() {
       if (permissionStatus === "granted") {
         try {
           await registerAndroidPushToken(user.id);
+          await scheduleDailyReminder(user.id);
         } catch {
           if (active) setSettingsError("This device could not be registered for notifications.");
         }
@@ -128,6 +130,10 @@ export function ProfileEngagement() {
     if (!user || !preferences) return;
     const next = { ...preferences, ...patch, updated_at: new Date().toISOString() };
     setPreferences(next);
+    if (patch.reminders_enabled === false) {
+      const { cancelDailyReminder } = await import("@/services/notifications");
+      await cancelDailyReminder(user.id);
+    }
     const { error: updateError } = await supabase.from("notification_preferences").upsert(next);
     if (updateError) {
       setPreferences(preferences);
